@@ -5,12 +5,12 @@
 
 ## Pull Requests I authored (reviewed by my partner)
 
-| PR     | Branch                       | Reviewer verdict                |
-| ------ | ---------------------------- | ------------------------------- |
-| [Link] | feature/1-project-foundation | Approved                        |
-| [Link] | feature/2-health-check       | Approved (after fixes)          |
-| [Link] | feature/3-category-seed      | Approved                        |
-| [Link] | feature/4-category-list      | Approved (after some deletions) |
+| PR                                                    | Branch                       | Reviewer verdict                |
+| ----------------------------------------------------- | ---------------------------- | ------------------------------- |
+| https://github.com/ShortXander101205/toktickit/pull/6 | feature/1-project-foundation | Approved                        |
+| https://github.com/ShortXander101205/toktickit/pull/7 | feature/2-health-check       | Approved (after fixes)          |
+| https://github.com/ShortXander101205/toktickit/pull/8 | feature/3-category-seed      | Approved                        |
+| https://github.com/ShortXander101205/toktickit/pull/9 | feature/4-category-list      | Approved (after some deletions) |
 
 **Reviewer comment I received:**
 
