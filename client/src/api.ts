@@ -20,6 +20,10 @@ export async function checkSystem(): Promise<SystemStatus> {
   if (!healthRes.ok) {
     throw new Error("Backend is offline");
   }
-  // TODO(Issue 4): fetch categories here
-  return { online: true, categories: [] };
+  const catRes = await fetch(`${API_URL}/api/categories`);
+  if (!catRes.ok) {
+    throw new Error("Failed to fetch categories");
+  }
+  const categories: Category[] = await catRes.json();
+  return { online: true, categories };
 }

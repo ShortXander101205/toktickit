@@ -7,7 +7,6 @@ type UiState = "idle" | "loading" | "success" | "error";
 export default function App() {
   const [state, setState] = useState<UiState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
-  void categories;
 
   async function handleCheck() {
     setState("loading");
@@ -34,7 +33,13 @@ export default function App() {
         {state === "success" && (
           <div>
             <p>System Status: Online</p>
-            {/* TODO(Issue 4): Render categories list here */}
+            <ul className="list-group mt-3">
+              {categories.map((category) => (
+                <li key={category.id} className="list-group-item">
+                  {category.name}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         {state === "error" && (
