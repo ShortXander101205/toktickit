@@ -1,19 +1,40 @@
-# Lab 1 — Peer Review Record  (fill this in)
+# Lab 1 — Peer Review Record
 
-**Author:** <your name> — <student id> — GitHub: @<username>
-**Peer reviewer:** <partner name> — <student id> — GitHub: @<username>
+**Author:** Al Xander James Ybanez — 67070503450 — GitHub: ShorXander101205
+**Peer reviewer:** Muhammad Asad Aziz — 67070503472 — GitHub: Muhammad-Asad-Aziz
 
 ## Pull Requests I authored (reviewed by my partner)
-| PR | Branch | Reviewer verdict |
-|----|--------|------------------|
-|    | feature/1-project-foundation |  |
-|    | feature/2-health-check |  |
-|    | feature/3-category-seed |  |
-|    | feature/4-category-list |  |
 
-Reviewer comment I received: <...>
-How I responded: <...>
+| PR     | Branch                       | Reviewer verdict       |
+| ------ | ---------------------------- | ---------------------- |
+| [Link] | feature/1-project-foundation | Approved               |
+| [Link] | feature/2-health-check       | Approved (after fixes) |
+| [Link] | feature/3-category-seed      | Approved               |
+| [Link] | feature/4-category-list      | [To be added]          |
+
+**Reviewer comment I received:**
+
+- **Issue 1:** "Everything is perfect"
+- **Issue 2:** "Your implementation is fine, but I want you to revert changes made to App.test.tsx, as that is for issue 4"
+- **Issue 3:** "Everything works out just fine. Running the code on my PC gives passing results."
+- **Issue 4:** [To be added]
+
+**How I responded:**
+
+- **Issue 1:** "Thanks for the review."
+- **Issue 2:** "Checked it out and made the changes."
+- **Issue 3:** "Glad to hear it works accordingly."
+- **Issue 4:** [To be added]
 
 ## Pull Requests I reviewed for my partner
-My comment: <...>
-Partner's response: <...>
+
+**My comment:**
+
+- Issue 1: The foundation requirements have been set, I verified the files. It fits well within Issue 1's criteria.
+- Issue 2: The overall implementation of Issue 2 is complete.
+- Issue 3: I have taken the time to manually test the requirements, I see no problems with the implementations for Issue 3.
+- Issue 4: [To be added]
+
+**Partner's response:**
+
+-
