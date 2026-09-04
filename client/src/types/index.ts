@@ -2,6 +2,7 @@ export interface RequesterUser {
   id: number;
   name: string;
   email: string;
+  department?: string | null;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;

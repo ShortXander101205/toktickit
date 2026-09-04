@@ -9,115 +9,118 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum TicketStatus {
-  NEW
-  ASSIGNED
-  IN_PROGRESS
-  PENDING_REQUESTER
-  RESOLVED
-  CLOSED
-  CANCELLED
-}
-
+// ---------------------------------------------------------------------------
+// 1. Requester User (Simulated Development Identity)
+// ---------------------------------------------------------------------------
 model RequesterUser {
-  id        Int      @id @default(autoincrement())
-  name      String   @map("name")
-  email     String   @unique @map("email")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                 Int          @id @default(autoincrement())
+  name               String
+  email              String       @unique
+  department         String?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  tickets            Ticket[]
-  removedAttachments Attachment[] @relation("RemovedByRequester")
+  // Relational Integrity
+  tickets            Ticket[]     @relation("RequesterTickets")
+  removedAttachments Attachment[] @relation("RequesterRemovedAttachments")
 
   @@map("requester_users")
 }
 
+// ---------------------------------------------------------------------------
+// 2. Related System (Affected Campus IT Services)
+// ---------------------------------------------------------------------------
 model RelatedSystem {
   id        Int      @id @default(autoincrement())
-  name      String   @unique @map("name")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tickets Ticket[]
+  // Relational Integrity
+  tickets   Ticket[]
 
   @@map("related_systems")
 }
 
+// ---------------------------------------------------------------------------
+// 3. Category (Problem Classification — Extended from Lab 1)
+// ---------------------------------------------------------------------------
 model Category {
   id          Int      @id @default(autoincrement())
-  code        String   @unique @map("code")
-  name        String   @unique @map("name")
-  description String?  @map("description")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  code        String?  @unique
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tickets Ticket[]
+  // Relational Integrity
+  tickets     Ticket[]
 
   @@map("categories")
 }
 
+// ---------------------------------------------------------------------------
+// 4. Ticket (Service Desk Incident / Request)
+// ---------------------------------------------------------------------------
 model Ticket {
-  id                String       @id @default(uuid()) @map("id")
-  ticketNumber      String       @unique @map("ticket_number")
-  requesterId       Int          @map("requester_id")
-  categoryId        Int          @map("category_id")
-  relatedSystemId   Int          @map("related_system_id")
-  summary           String       @db.VarChar(100) @map("summary")
-  description       String       @db.VarChar(2000) @map("description")
-  requestedPriority Priority     @default(MEDIUM) @map("requested_priority")
-  itPriority        Priority     @default(MEDIUM) @map("it_priority")
-  currentStatus     TicketStatus @default(NEW) @map("current_status")
-  version           Int          @default(1) @map("version")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  id                Int           @id @default(autoincrement())
+  ticketNumber      String        @unique @db.VarChar(32) // Format: TKT-YYYY-NNNNN
+  requesterId       Int
+  categoryId        Int
+  relatedSystemId   Int
+  summary           String        @db.VarChar(100)
+  description       String        @db.Text
+  requestedPriority String        // Low, Medium, High, Urgent
+  itPriority        String?       // Low, Medium, High, Urgent
+  currentStatus     String        @default("New") // New, Assigned, In Progress, Pending Requester, Resolved, Closed, Cancelled
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  requester     RequesterUser @relation(fields: [requesterId], references: [id], onDelete: Restrict)
-  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  relatedSystem RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
-  attachments   Attachment[]
+  // Relations
+  requester         RequesterUser @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  attachments       Attachment[]
 
   @@index([requesterId])
   @@index([currentStatus])
-  @@index([categoryId])
-  @@index([relatedSystemId])
-  @@index([createdAt])
   @@map("tickets")
 }
 
+// ---------------------------------------------------------------------------
+// 5. Attachment (Supporting File Metadata & Soft-Removal Tombstone)
+// ---------------------------------------------------------------------------
 model Attachment {
-  id                   String    @id @default(uuid()) @map("id")
-  ticketId             String    @map("ticket_id")
-  originalFilename     String    @map("original_filename")
-  storedFilename       String    @unique @map("stored_filename")
-  mimeType             String    @map("mime_type")
-  fileSize             Int       @map("file_size")
-  isRemoved            Boolean   @default(false) @map("is_removed")
-  removalReason        String?   @db.VarChar(500) @map("removal_reason")
-  removedAt            DateTime? @map("removed_at")
-  removedByRequesterId Int?      @map("removed_by_requester_id")
-  createdAt            DateTime  @default(now()) @map("created_at")
+  id                   Int            @id @default(autoincrement())
+  ticketId             Int
+  originalFilename     String
+  storedFilename       String         @unique
+  mimeType             String
+  fileSize             Int            // Size in bytes
+  isRemoved            Boolean        @default(false)
+  removalReason        String?        @db.Text
+  removedAt            DateTime?
+  removedByRequesterId Int?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
-  ticket             Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  removedByRequester RequesterUser? @relation("RemovedByRequester", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
+  // Relations
+  ticket               Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  removedByRequester   RequesterUser? @relation("RequesterRemovedAttachments", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
 
   @@index([ticketId])
-  @@index([isRemoved])
   @@map("attachments")
 }
 
-model TicketSequence {
-  year       Int @id @map("year")
-  lastNumber Int @default(0) @map("last_number")
+// ---------------------------------------------------------------------------
+// 6. Ticket Number Sequence (Annual Sequence Reset for TKT-YYYY-NNNNN)
+// ---------------------------------------------------------------------------
+model TicketNumberSequence {
+  year    Int @id
+  nextVal Int @default(1)
 
-  @@map("ticket_sequences")
+  @@map("ticket_number_sequences")
 }

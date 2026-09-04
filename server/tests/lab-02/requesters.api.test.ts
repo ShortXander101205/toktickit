@@ -23,10 +23,14 @@ describe("Feature 2: Requester Context & Reference Data APIs", () => {
     it("strictly filters out inactive requesters (isActive = false)", async () => {
       const res = await request(app).get("/api/requesters");
       expect(res.status).toBe(200);
-      const inactive = res.body.data.find(
+      const inactive1 = res.body.data.find(
         (u: any) => u.email === "inactive.user@kmutt.ac.th"
       );
-      expect(inactive).toBeUndefined();
+      const inactive2 = res.body.data.find(
+        (u: any) => u.email === "prasert.ina@kmutt.ac.th"
+      );
+      expect(inactive1).toBeUndefined();
+      expect(inactive2).toBeUndefined();
     });
 
     it("returns requesters sorted alphabetically by name", async () => {
