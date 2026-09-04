@@ -1,0 +1,71 @@
+/* KMUTT Zen Green Theme Tokens & Global Styles */
+:root {
+  /* KMUTT Zen Green Palette */
+  --color-primary-green: #006b3c;
+  --color-secondary-green: #0b7a46;
+  --color-pale-green: #eaf6ef;
+  --color-page-bg: #f5f7f6;
+  --color-surface-card: #ffffff;
+
+  /* KMUTT Brand Accents */
+  --color-kmutt-orange: #fa4616;
+  --color-kmutt-yellow: #ffc72c;
+  --color-kmutt-blue-grey: #7b8189;
+  --color-interactive-orange: #8a2608;
+
+  /* Functional & Typography Tokens */
+  --color-text-primary: #1f2937;
+  --color-text-muted: #5b6573;
+  --color-field-bg: #ffffff;
+  --color-field-border: #d1d5db;
+  --color-field-readonly-bg: #f5f7f6;
+  --color-field-readonly-border: #e5e7eb;
+
+  --color-success: #2e7d32;
+  --color-warning: #b26a00;
+  --color-warning-bg: #fff8e1;
+  --color-danger: #b3261e;
+  --color-danger-bg: #fdf2f2;
+
+  /* Elevation & Focus */
+  --focus-ring: 0 0 0 3px rgba(11, 122, 70, 0.2);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-page-bg);
+  color: var(--color-text-primary);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Zen Green Utility Overrides */
+.btn-primary-green {
+  background-color: var(--color-primary-green);
+  border-color: var(--color-primary-green);
+  color: #ffffff;
+  font-weight: 600;
+  height: 38px;
+  border-radius: 6px;
+  transition: filter 0.15s ease-in-out;
+}
+
+.btn-primary-green:hover:not(:disabled) {
+  background-color: var(--color-secondary-green);
+  border-color: var(--color-secondary-green);
+  color: #ffffff;
+  filter: brightness(0.95);
+}
+
+.btn-primary-green:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.form-select:focus,
+.form-control:focus {
+  border-color: var(--color-secondary-green);
+  box-shadow: var(--focus-ring);
+}
