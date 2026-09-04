@@ -1,20 +1,56 @@
+import { RequesterUser, RelatedSystem, Category, ApiResponse } from "./types/index.js";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
-export interface Category {
-  id: number;
-  name: string;
-}
+// Re-export Category for backward compatibility
+export type { Category } from "./types/index.js";
 
 export interface SystemStatus {
   online: boolean;
   categories: Category[];
 }
 
-// Issue 2 + Issue 4 — call the backend.
-// Steps: fetch `${API_URL}/api/health`; if not ok, throw.
-//        then fetch `${API_URL}/api/categories`; if not ok, throw.
-//        return { online: true, categories }.
-// Throwing on failure lets the UI show a single Offline/error state.
+export function getRequesterHeaders(activeRequesterId?: number | null): HeadersInit {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (activeRequesterId) {
+    headers["x-requester-id"] = String(activeRequesterId);
+  }
+  return headers;
+}
+
+// Fetch active requesters
+export async function fetchRequesters(): Promise<RequesterUser[]> {
+  const res = await fetch(`${API_URL}/api/requesters`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch requesters: HTTP ${res.status}`);
+  }
+  const json: ApiResponse<RequesterUser[]> = await res.json();
+  return json.data;
+}
+
+// Fetch active related systems
+export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
+  const res = await fetch(`${API_URL}/api/related-systems`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch related systems: HTTP ${res.status}`);
+  }
+  const json: ApiResponse<RelatedSystem[]> = await res.json();
+  return json.data;
+}
+
+// Fetch active categories
+export async function fetchCategories(): Promise<Category[]> {
+  const res = await fetch(`${API_URL}/api/categories`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch categories: HTTP ${res.status}`);
+  }
+  const json: ApiResponse<Category[]> = await res.json();
+  return json.data;
+}
+
+// Lab 1 backward compatibility method
 export async function checkSystem(): Promise<SystemStatus> {
   const healthRes = await fetch(`${API_URL}/api/health`);
   if (!healthRes.ok) {
@@ -24,6 +60,7 @@ export async function checkSystem(): Promise<SystemStatus> {
   if (!catRes.ok) {
     throw new Error("Failed to fetch categories");
   }
-  const categories: Category[] = await catRes.json();
+  const json = await catRes.json();
+  const categories: Category[] = Array.isArray(json) ? json : json.data;
   return { online: true, categories };
 }
