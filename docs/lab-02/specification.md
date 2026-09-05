@@ -51,7 +51,7 @@ The IT department requires a self-service ticketing interface for end-users (Req
 * **FR-10 (Attachment Upload & Validation):** The system shall allow uploading attachments during or after ticket creation, validating file extension, declared MIME type, file size ($\le 5\text{ MB}$), and active file count ($\le 5$).
 * **FR-11 (Attachment Download):** The system shall stream active attachment binaries to authorized Requesters who own the parent ticket.
 * **FR-12 (Attachment Soft-Removal):** The system shall permit the Requester to soft-remove their own attachment on non-Closed tickets by providing a mandatory removal reason.
-* **FR-13 (Soft-Removal Audit Trail):** Upon soft-removal, the system shall retain the attachment metadata record, record `deletedAt` and `deletedById`, delete the physical binary from storage, and create an immutable `ATTACHMENT_REMOVED` TicketEvent in the same database transaction.
+* **FR-13 (Soft-Removal Audit Trail):** Upon soft-removal, the system shall retain the attachment metadata record, record `isRemoved = true`, `removalReason`, `removedAt`, and `removedByRequesterId`, delete the physical binary from storage, and create an immutable `ATTACHMENT_REMOVED` TicketEvent in the same database transaction.
 * **FR-14 (Download Blocking on Removed Attachments):** The system shall reject download or preview requests for soft-removed attachments with HTTP 404/410.
 * **FR-15 (Cross-Requester Security Enforcement):** The backend shall reject any attempt by Requester B to view, query, download, or delete tickets or attachments owned by Requester A with HTTP 403 Forbidden or HTTP 404 Not Found.
 
@@ -100,164 +100,162 @@ The UI implements the KMUTT **Zen Green** design language defined in [docs/lab-0
 ### 7.1 Entity Relationship Diagram
 ```mermaid
 erDiagram
-    RequesterUser ||--o{ Ticket : "requests"
+    RequesterUser ||--o{ Ticket : "requests (RequesterTickets)"
+    RequesterUser ||--o{ Attachment : "removes (RequesterRemovedAttachments)"
     Category ||--o{ Ticket : "classifies"
     RelatedSystem ||--o{ Ticket : "applies to"
     Ticket ||--o{ Attachment : "contains"
-    Ticket ||--o{ TicketEvent : "records"
-    RequesterUser ||--o{ Attachment : "uploads"
-    RequesterUser ||--o{ TicketEvent : "acts in"
 ```
 
 ### 7.2 Prisma Models (`server/prisma/schema.prisma`)
 
 ```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum TicketStatus {
-  NEW
-  ASSIGNED
-  IN_PROGRESS
-  PENDING_REQUESTER
-  RESOLVED
-  CLOSED
-  CANCELLED
-}
-
+// ---------------------------------------------------------------------------
+// 1. Requester User (Simulated Development Identity)
+// ---------------------------------------------------------------------------
 model RequesterUser {
-  id          Int          @id @default(autoincrement())
-  email       String       @unique
-  displayName String
-  department  String?
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                 Int          @id @default(autoincrement())
+  name               String
+  email              String       @unique
+  department         String?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  tickets     Ticket[]
-  attachments Attachment[]
-  events      TicketEvent[]
+  // Relational Integrity
+  tickets            Ticket[]     @relation("RequesterTickets")
+  removedAttachments Attachment[] @relation("RequesterRemovedAttachments")
 
   @@map("requester_users")
 }
 
-model Category {
+// ---------------------------------------------------------------------------
+// 2. Related System (Affected Campus IT Services)
+// ---------------------------------------------------------------------------
+model RelatedSystem {
   id        Int      @id @default(autoincrement())
   name      String   @unique
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relational Integrity
   tickets   Ticket[]
-
-  @@map("categories")
-}
-
-model RelatedSystem {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  tickets     Ticket[]
 
   @@map("related_systems")
 }
 
+// ---------------------------------------------------------------------------
+// 3. Category (Problem Classification — Extended from Lab 1)
+// ---------------------------------------------------------------------------
+model Category {
+  id          Int      @id @default(autoincrement())
+  code        String?  @unique
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relational Integrity
+  tickets     Ticket[]
+
+  @@map("categories")
+}
+
+// ---------------------------------------------------------------------------
+// 4. Ticket (Service Desk Incident / Request)
+// ---------------------------------------------------------------------------
 model Ticket {
-  id                String       @id @default(uuid())
-  ticketNo          String       @unique
-  summary           String       @db.VarChar(100)
-  description       String       @db.VarChar(2000)
+  id                Int           @id @default(autoincrement())
+  ticketNumber      String        @unique @db.VarChar(32) // Format: TKT-YYYY-NNNNN
+  requesterId       Int
   categoryId        Int
   relatedSystemId   Int
-  requestedPriority Priority     @default(MEDIUM)
-  itPriority        Priority     @default(MEDIUM)
-  status            TicketStatus @default(NEW)
-  requesterId       Int
-  ownerId           Int?
-  resolutionSummary String?
-  version           Int          @default(1)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  summary           String        @db.VarChar(100)
+  description       String        @db.Text
+  requestedPriority String        // Low, Medium, High, Urgent
+  itPriority        String?       // Low, Medium, High, Urgent
+  currentStatus     String        @default("New") // New, Assigned, In Progress, Pending Requester, Resolved, Closed, Cancelled
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  category      Category      @relation(fields: [categoryId], references: [id])
-  relatedSystem RelatedSystem @relation(fields: [relatedSystemId], references: [id])
-  requester     RequesterUser @relation(fields: [requesterId], references: [id])
-  attachments   Attachment[]
-  events        TicketEvent[]
+  // Relations
+  requester         RequesterUser @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  attachments       Attachment[]
 
   @@index([requesterId])
-  @@index([status])
-  @@index([categoryId])
-  @@index([createdAt])
+  @@index([currentStatus])
   @@map("tickets")
 }
 
+// ---------------------------------------------------------------------------
+// 5. Attachment (Supporting File Metadata & Soft-Removal Tombstone)
+// ---------------------------------------------------------------------------
 model Attachment {
-  id               String    @id @default(uuid())
-  ticketId         String
-  uploadedById     Int
-  originalFilename String
-  mimeType         String
-  sizeBytes        Int
-  storageKey       String
-  deletedAt        DateTime?
-  deletedById      Int?
-  createdAt        DateTime  @default(now())
+  id                   Int            @id @default(autoincrement())
+  ticketId             Int
+  originalFilename     String
+  storedFilename       String         @unique
+  mimeType             String
+  fileSize             Int            // Size in bytes
+  isRemoved            Boolean        @default(false)
+  removalReason        String?        @db.Text
+  removedAt            DateTime?
+  removedByRequesterId Int?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
-  ticket     Ticket        @relation(fields: [ticketId], references: [id])
-  uploadedBy RequesterUser @relation(fields: [uploadedById], references: [id])
+  // Relations
+  ticket               Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  removedByRequester   RequesterUser? @relation("RequesterRemovedAttachments", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
 
   @@index([ticketId])
-  @@index([deletedAt])
   @@map("attachments")
 }
 
-model TicketEvent {
-  id          String   @id @default(uuid())
-  ticketId    String
-  actorId     Int
-  eventType   String
-  payloadJson Json
-  createdAt   DateTime @default(now())
+// ---------------------------------------------------------------------------
+// 6. Ticket Number Sequence (Annual Sequence Reset for TKT-YYYY-NNNNN)
+// ---------------------------------------------------------------------------
+model TicketNumberSequence {
+  year    Int @id
+  nextVal Int @default(1)
 
-  ticket Ticket        @relation(fields: [ticketId], references: [id])
-  actor  RequesterUser @relation(fields: [actorId], references: [id])
-
-  @@index([ticketId])
-  @@map("ticket_events")
-}
-
-model TicketSequence {
-  year       Int @id
-  lastNumber Int @default(0)
-
-  @@map("ticket_sequences")
+  @@map("ticket_number_sequences")
 }
 ```
 
 ### 7.3 Seed Specifications (`server/prisma/seed.ts`)
 Must execute idempotently via `upsert`:
-* **4 Categories:** `Account and Access`, `Hardware`, `Software`, `Network`.
+* **4 Categories:**
+  1. `ACC`: Account and Access
+  2. `HW`: Hardware
+  3. `SW`: Software
+  4. `NET`: Network
 * **7 Related Systems:** `Email`, `Campus Wi-Fi`, `VPN`, `LEB2 App`, `Grade Submission App`, `Printer`, `Corporate Laptop`.
-* **4 Active Requesters:**
-  1. Jennifer Anderson (`jennifer.anderson@kmutt.ac.th`, Department: Computer Engineering)
-  2. Michael Brown (`michael.brown@kmutt.ac.th`, Department: Information Technology)
-  3. David Lee (`david.lee@kmutt.ac.th`, Department: Electrical Engineering)
-  4. Sarah Johnson (`sarah.johnson@kmutt.ac.th`, Department: Science Faculty)
-* **1 Inactive Requester:**
-  5. Inactive User (`inactive.user@kmutt.ac.th`, Department: Registrar, `isActive: false`).
+* **5 Thai Development Personas (Peer Reviewer Program):**
+  1. Sompong IT (`sompong.it@kmutt.ac.th`, Department: Information Technology Office, `isActive: true`)
+  2. Anong Staff (`anong.sta@kmutt.ac.th`, Department: Academic Affairs Office, `isActive: true`)
+  3. Kittisak Student (`kittisak.stu@kmutt.ac.th`, Department: Computer Engineering Dept, `isActive: true`)
+  4. Wichai Faculty (`wichai.fac@kmutt.ac.th`, Department: Department of Mathematics, `isActive: true`)
+  5. Prasert Inactive (`prasert.ina@kmutt.ac.th`, Department: Human Resources Office, `isActive: false`)
+* **5 Baseline Development Personas:**
+  1. Jennifer Anderson (`jennifer.anderson@kmutt.ac.th`, Department: Computer Engineering, `isActive: true`)
+  2. Michael Brown (`michael.brown@kmutt.ac.th`, Department: Information Technology, `isActive: true`)
+  3. David Lee (`david.lee@kmutt.ac.th`, Department: Electrical Engineering, `isActive: true`)
+  4. Sarah Johnson (`sarah.johnson@kmutt.ac.th`, Department: Science Faculty, `isActive: true`)
+  5. Inactive Test User (`inactive.user@kmutt.ac.th`, Department: Registrar Office, `isActive: false`)
 
 ---
 
@@ -294,7 +292,7 @@ Must execute idempotently via `upsert`:
 * **AC-13 (Valid Attachment Upload):** Given a valid file ($\le 5\text{ MB}$, allowed type) and a ticket with $< 5$ active attachments, when uploaded, then the binary is stored, metadata is saved, and HTTP 201 is returned.
 * **AC-14 (Attachment Size & Type Rejection):** Given a file $> 5\text{ MB}$ or an invalid file extension/MIME (e.g. `.exe`, `.txt`), when upload is attempted, then the upload is rejected with HTTP 400/422 and a clear error message.
 * **AC-15 (Attachment Quantity Limit):** Given a ticket with 5 active attachments, when an upload of a 6th attachment is attempted, then the system rejects the upload stating the 5-file limit is reached.
-* **AC-16 (Attachment Soft-Removal with Reason):** Given an active attachment owned by the requester, when the requester confirms removal and provides a reason ($\ge 5$ characters), then the attachment record is soft-deleted (`deletedAt`, `deletedById`), an `ATTACHMENT_REMOVED` TicketEvent is persisted in the same transaction, and the binary is deleted from storage.
+* **AC-16 (Attachment Soft-Removal with Reason):** Given an active attachment owned by the requester, when the requester confirms removal and provides a reason ($\ge 5$ characters), then the attachment record is soft-deleted (`isRemoved = true`, `removalReason`, `removedAt`, `removedByRequesterId`), an `ATTACHMENT_REMOVED` TicketEvent is persisted in the same transaction, and the binary is deleted from storage.
 * **AC-17 (Soft-Removed Download Block):** Given an attachment has been soft-removed, when any user attempts to download via `GET /api/attachments/:id/download`, then HTTP 404 or 410 is returned.
 * **AC-18 (Cross-Requester Attachment Protection):** Given Requester B attempts to download an attachment belonging to Requester A's ticket, then HTTP 403 or 404 is returned.
 * **AC-19 (Duplicate Submission Prevention):** Given the user clicks "Submit Ticket", when the asynchronous request is pending, then the submit button shows a busy spinner and is disabled, preventing double submission.
@@ -322,7 +320,7 @@ Must execute idempotently via `upsert`:
 
 ## 11. Assumptions & Design Decisions
 
-1. **Entity Primary Key Types:** We retain `Int` for `Category`, `RequesterUser`, and `RelatedSystem` for clean relational referencing, while using `String (UUID)` for `Ticket`, `Attachment`, and `TicketEvent` to guarantee global uniqueness and safe unguessable resource keys.
+1. **Entity Primary Key Types:** Standardized on `Int` autoincrement primary keys (`SERIAL`) across `Category`, `RequesterUser`, `RelatedSystem`, `Ticket`, and `Attachment` to match peer-reviewer compatibility and the course standard. Unique external identification for tickets is provided by the formatted `ticketNumber` (`TKT-YYYY-NNNNN`), and internal storage references for attachments use the `@unique` `storedFilename`.
 2. **API Path Aliasing:** Routes are hosted at `/api/...` to strictly match Labsheet Section 6 conventions (`/api/tickets`, `/api/categories`, etc.), with backend support for `/api/v1/...` namespace mapping.
-3. **Storage Strategy:** Attachment binaries are stored in a dedicated local directory using generated UUID filenames behind an abstraction service, preparing the codebase for transparent drop-in of SeaweedFS S3 client in production.
-4. **Database Indexes:** Indexed `Ticket(requesterId)` for instant ticket isolation; indexed `Ticket(status)` and `Ticket(createdAt)` for optimized filtering and sorting; indexed `Attachment(ticketId, deletedAt)` for fast active attachment queries.
+3. **Storage Strategy:** Attachment binaries are stored in a dedicated local directory using generated unique stored filenames behind an abstraction service, preparing the codebase for transparent drop-in of SeaweedFS S3 client in production.
+4. **Database Indexes:** Indexed `Ticket(requesterId)` for instant ticket isolation; indexed `Ticket(currentStatus)` for optimized filtering; indexed `Attachment(ticketId)` for fast active attachment queries.

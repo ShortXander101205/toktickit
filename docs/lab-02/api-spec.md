@@ -164,26 +164,25 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
   * `description`: Required string, trimmed length 10–2000 characters.
   * `categoryId`: Required integer, must exist in `Category` table.
   * `relatedSystemId`: Required integer, must exist in `RelatedSystem` table.
-  * `requestedPriority`: Required enum (`LOW`, `MEDIUM`, `HIGH`, `URGENT`).
+  * `requestedPriority`: Required string (`Low`, `Medium`, `High`, `Urgent`).
 * **Response `201 Created`:**
 ```json
 {
   "success": true,
   "data": {
-    "id": "c1f8a84b-0123-4def-9abc-1234567890ab",
-    "ticketNo": "TKT-2026-00001",
+    "id": 1,
+    "ticketNumber": "TKT-2026-00001",
     "summary": "Laptop battery drains quickly",
     "description": "My laptop battery is draining much faster than usual even when idle.",
     "categoryId": 2,
     "categoryName": "Hardware",
     "relatedSystemId": 7,
     "relatedSystemName": "Corporate Laptop",
-    "requestedPriority": "MEDIUM",
-    "itPriority": "MEDIUM",
-    "status": "NEW",
+    "requestedPriority": "Medium",
+    "itPriority": "Medium",
+    "currentStatus": "New",
     "requesterId": 1,
     "requesterName": "Jennifer Anderson",
-    "version": 1,
     "createdAt": "2026-09-03T11:00:00.000Z",
     "updatedAt": "2026-09-03T11:00:00.000Z"
   }
@@ -201,11 +200,11 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
 * **Headers:**
   * `x-requester-id: <number>` (Mandatory)
 * **Query Parameters:**
-  * `search` *(string, optional)*: Keyword to search across `ticketNo`, `summary`, and `description`.
+  * `search` *(string, optional)*: Keyword to search across `ticketNumber`, `summary`, and `description`.
   * `category` *(integer, optional)*: Filter by `categoryId`.
-  * `status` *(string, optional)*: Filter by `TicketStatus` enum.
+  * `status` *(string, optional)*: Filter by `currentStatus`.
   * `priority` *(string, optional)*: Filter by `requestedPriority`.
-  * `sortBy` *(string, optional, default: "createdAt")*: Whitelist: `ticketNo`, `createdAt`, `updatedAt`, `status`.
+  * `sortBy` *(string, optional, default: "createdAt")*: Whitelist: `ticketNumber`, `createdAt`, `updatedAt`, `currentStatus`.
   * `sortOrder` *(string, optional, default: "desc")*: `asc` or `desc`.
   * `page` *(integer, optional, default: 1)*: 1-indexed page number.
   * `pageSize` *(integer, optional, default: 10)*: Number of items per page (allowed: 10, 25, 50).
@@ -215,13 +214,13 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
   "success": true,
   "data": [
     {
-      "id": "c1f8a84b-0123-4def-9abc-1234567890ab",
-      "ticketNo": "TKT-2026-00001",
+      "id": 1,
+      "ticketNumber": "TKT-2026-00001",
       "summary": "Laptop battery drains quickly",
       "categoryName": "Hardware",
-      "requestedPriority": "MEDIUM",
-      "itPriority": "MEDIUM",
-      "status": "NEW",
+      "requestedPriority": "Medium",
+      "itPriority": "Medium",
+      "currentStatus": "New",
       "ticketOwner": null,
       "createdAt": "2026-09-03T11:00:00.000Z",
       "updatedAt": "2026-09-03T11:00:00.000Z"
@@ -249,31 +248,30 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
 {
   "success": true,
   "data": {
-    "id": "c1f8a84b-0123-4def-9abc-1234567890ab",
-    "ticketNo": "TKT-2026-00001",
+    "id": 1,
+    "ticketNumber": "TKT-2026-00001",
     "summary": "Laptop battery drains quickly",
     "description": "My laptop battery is draining much faster than usual even when idle.",
     "categoryId": 2,
     "categoryName": "Hardware",
     "relatedSystemId": 7,
     "relatedSystemName": "Corporate Laptop",
-    "requestedPriority": "MEDIUM",
-    "itPriority": "MEDIUM",
-    "status": "NEW",
+    "requestedPriority": "Medium",
+    "itPriority": "Medium",
+    "currentStatus": "New",
     "requesterId": 1,
     "requesterName": "Jennifer Anderson",
     "ticketOwner": null,
     "resolutionSummary": null,
-    "version": 1,
     "createdAt": "2026-09-03T11:00:00.000Z",
     "updatedAt": "2026-09-03T11:00:00.000Z",
     "attachments": [
       {
-        "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        "id": 1,
         "originalFilename": "battery_report.pdf",
         "mimeType": "application/pdf",
-        "sizeBytes": 1048576,
-        "isDeleted": false,
+        "fileSize": 1048576,
+        "isRemoved": false,
         "createdAt": "2026-09-03T11:05:00.000Z"
       }
     ],
@@ -307,11 +305,11 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
 {
   "success": true,
   "data": {
-    "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    "ticketId": "c1f8a84b-0123-4def-9abc-1234567890ab",
+    "id": 1,
+    "ticketId": 1,
     "originalFilename": "battery_report.pdf",
     "mimeType": "application/pdf",
-    "sizeBytes": 1048576,
+    "fileSize": 1048576,
     "createdAt": "2026-09-03T11:05:00.000Z"
   }
 }
@@ -330,12 +328,12 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
   * `x-requester-id: <number>` (Mandatory)
 * **Security & Invariants:**
   * Parent ticket must belong to `x-requester-id`.
-  * If `attachment.deletedAt !== null` (soft-removed), download is strictly blocked.
+  * If `attachment.isRemoved === true` or `attachment.removedAt !== null` (soft-removed), download is strictly blocked.
 * **Response `200 OK`:**
   * **Headers:**
     * `Content-Type: <attachment.mimeType>`
     * `Content-Disposition: attachment; filename="<originalFilename>"`
-    * `Content-Length: <sizeBytes>`
+    * `Content-Length: <fileSize>`
   * **Body:** Raw binary byte stream.
 * **Error Responses:**
   * `410 Gone`: Attachment has been soft-removed.
@@ -359,20 +357,19 @@ This document defines the authoritative REST API contract for **TokTickIT Lab 2 
 * **Validation Rules:**
   * `reason`: Required string, trimmed length $\ge 5$ characters.
   * Requester must own the parent ticket.
-  * Requester must be the user who uploaded the attachment (`uploadedById == requesterId`).
 * **Transactional Execution:**
-  1. Sets `deletedAt = now()` and `deletedById = requesterId` on `Attachment`.
-  2. Creates `ATTACHMENT_REMOVED` in `TicketEvent` table recording filename, uploader, remover, reason, and timestamp.
-  3. Deletes binary file from storage immediately.
+  1. Sets `isRemoved = true`, `removedAt = now()`, `removalReason = reason`, and `removedByRequesterId = requesterId` on `Attachment`.
+  2. Deletes binary file from storage immediately.
 * **Response `200 OK`:**
 ```json
 {
   "success": true,
   "message": "Attachment removed successfully",
   "data": {
-    "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    "deletedAt": "2026-09-03T11:15:00.000Z",
-    "reason": "Uploaded incorrect system diagnostics file"
+    "id": 1,
+    "removedAt": "2026-09-03T11:15:00.000Z",
+    "isRemoved": true,
+    "removalReason": "Uploaded incorrect system diagnostics file"
   }
 }
 ```

@@ -18,7 +18,7 @@ export interface RequesterContextType {
   clearRequester: () => void;
 }
 
-const RequesterContext = createContext<RequesterContextType | undefined>(undefined);
+export const RequesterContext = createContext<RequesterContextType | undefined>(undefined);
 
 export function RequesterProvider({ children }: { children: React.ReactNode }) {
   const [currentRequester, setCurrentRequester] = useState<RequesterUser | null>(() => {

@@ -68,8 +68,8 @@ graph TD
 
 ### Scope (Included)
 1. **Database Model & Seed Data:**
-   * Introduce a `RequesterUser` (or `User`) model in `server/prisma/schema.prisma` with fields: `id` (Int/UUID), `email` (unique String), `displayName` (String), `department` (optional String), `isActive` (Boolean, default `true`), and timestamps.
-   * Seed data in `server/prisma/seed.ts` containing at least 4 active Requesters (e.g. Jennifer Anderson, Michael Brown, David Lee, Sarah Johnson) and at least 1 inactive Requester (e.g. Inactive User), runnable repeatedly without duplicates.
+   * Introduce a `RequesterUser` model in `server/prisma/schema.prisma` with fields: `id` (`Int` autoincrement), `email` (unique `String`), `name` (`String`), `department` (optional `String`), `isActive` (`Boolean`, default `true`), and timestamps.
+   * Seed data in `server/prisma/seed.ts` containing at least 4 active Requesters (e.g. Sompong IT, Jennifer Anderson, etc.) and at least 1 inactive Requester, runnable repeatedly without duplicates.
 2. **Backend API:**
    * Implement `GET /api/v1/requesters` returning HTTP 200 with an array of active requesters (`where: { isActive: true }`). Inactive requesters must be excluded.
 3. **Frontend Presentation & State:**
@@ -108,14 +108,15 @@ graph TD
 
 ### Scope (Included)
 1. **Database Schema & Reference Data:**
-   * Add `RelatedSystem` model (`id`, `name`, `description`, `isActive`, `createdAt`) in `schema.prisma`.
+   * Add `RelatedSystem` model (`id`, `name`, `isActive`, `createdAt`, `updatedAt`) in `schema.prisma`.
    * Seed at least 6 realistic Related Systems idempotently: `Email`, `Campus Wi-Fi`, `VPN`, `LEB2 App`, `Grade Submission App`, `Printer`, `Corporate Laptop`.
-   * Add `Ticket` model with fields: `id`, `ticketNo` (unique String), `summary` (String), `description` (String), `categoryId` (FK to Category), `relatedSystemId` (FK to RelatedSystem), `requestedPriority` (Enum: `LOW`, `MEDIUM`, `HIGH`, `URGENT`), `itPriority` (Enum), `status` (Enum: default `NEW`), `requesterId` (FK to RequesterUser), `version` (Int, default 1), and timestamps.
+   * Add `Ticket` model with fields: `id` (`Int` autoincrement), `ticketNumber` (unique `String` `@db.VarChar(32)`), `summary` (`String`), `description` (`Text`), `categoryId` (FK to Category), `relatedSystemId` (FK to RelatedSystem), `requestedPriority` (`String`: "Low", "Medium", "High", "Urgent"), `itPriority` (`String?`), `currentStatus` (`String`, default `"New"`), `requesterId` (FK to RequesterUser), and timestamps.
+   * Add `TicketNumberSequence` model (`year Int @id`, `nextVal Int @default(1)`) in `schema.prisma` for atomic annual sequence generation.
 2. **Ticket Number Generator Service:**
    * Implement transactional `generateTicketNumber()` utility producing format `TKT-YYYY-NNNNN` with annual sequence reset logic.
 3. **Backend API:**
    * `GET /api/v1/related-systems`: Returns active related systems.
-   * `POST /api/v1/tickets`: Accepts ticket payload, validates input, assigns active `requesterId`, generates unique `ticketNo`, sets initial `status = NEW`, initializes `version = 1`, and returns HTTP 201 with the created ticket DTO.
+   * `POST /api/v1/tickets`: Accepts ticket payload, validates input, assigns active `requesterId`, generates unique `ticketNumber`, sets initial `currentStatus = "New"`, and returns HTTP 201 with the created ticket DTO.
 4. **Frontend UI (Create Ticket Screen):**
    * Responsive layout conforming to Zen Green UI guidelines (Section 8.2 & 8.3).
    * Fields: Read-only system-generated values (Ticket Number placeholder, Ticket Date, Requester display name), Category dropdown, Related System dropdown, Requested Priority dropdown, Summary text input, Description textarea.
@@ -155,7 +156,7 @@ graph TD
 ### Scope (Included)
 1. **Backend API (Ticket List Endpoint):**
    * Implement `GET /api/v1/tickets` scoped to the current requester (`where: { requesterId }`).
-   * Support query parameters: `search` (case-insensitive search across `ticketNo`, `summary`, and `description`), `categoryId`, `requestedPriority`, `itPriority`, `status`, `sortBy` (whitelist: `ticketNo`, `createdAt`, `updatedAt`, `status`), `sortOrder` (`asc`/`desc`, default `desc`), `page` (default 1), and `limit` (default 10).
+   * Support query parameters: `search` (case-insensitive search across `ticketNumber`, `summary`, and `description`), `categoryId`, `requestedPriority`, `itPriority`, `currentStatus`, `sortBy` (whitelist: `ticketNumber`, `createdAt`, `updatedAt`, `currentStatus`), `sortOrder` (`asc`/`desc`, default `desc`), `page` (default 1), and `limit` (default 10).
    * Return pagination metadata: `{ data: Ticket[], pagination: { totalItems, totalPages, currentPage, pageSize } }`.
 2. **Frontend UI (My Tickets Screen):**
    * Responsive layout conforming to Zen Green UI guidelines (Section 8.4 & 8.7).
@@ -201,15 +202,15 @@ graph TD
 
 ### Scope (Included)
 1. **Database Schema & Audit Models:**
-   * Add `Attachment` model in `schema.prisma`: `id` (UUID/Int), `ticketId` (FK), `uploadedById` (FK to RequesterUser), `originalFilename` (String), `mimeType` (String), `sizeBytes` (Int), `storageKey` (String), `deletedAt` (DateTime nullable), `deletedById` (Int/UUID nullable), timestamps.
-   * Add `TicketEvent` model in `schema.prisma`: `id` (UUID/Int), `ticketId` (FK), `actorId` (FK to RequesterUser), `eventType` (String, e.g. `ATTACHMENT_ADDED`, `ATTACHMENT_REMOVED`), `payloadJson` (String / Json), `createdAt` (DateTime).
+   * Add `Attachment` model in `schema.prisma`: `id` (`Int` autoincrement), `ticketId` (`Int` FK), `originalFilename` (`String`), `storedFilename` (unique `String`), `mimeType` (`String`), `fileSize` (`Int`), `isRemoved` (`Boolean`, default `false`), `removalReason` (`Text` nullable), `removedAt` (`DateTime` nullable), `removedByRequesterId` (`Int` nullable FK), `createdAt`, `updatedAt`.
+   * Add `TicketEvent` audit structure for transactional soft-removal tracking.
 2. **Storage Adapter Service:**
    * Implement local storage service abstraction supporting save, stream/download, and immediate delete of file binaries.
 3. **Backend APIs:**
    * `GET /api/v1/tickets/:id`: Retrieves ticket details if `ticket.requesterId == currentRequester.id`. Rejects unauthorized access (HTTP 403/404).
    * `POST /api/v1/tickets/:id/attachments`: Handles multipart upload with validation (max 5 MB, max 5 active attachments per ticket, allowed types: JPG/JPEG, PNG, WEBP, PDF). Stores binary, records metadata, returns HTTP 201.
-   * `GET /api/v1/tickets/:id/attachments/:attachmentId`: Authorizes requester; streams active binary. If soft-removed (`deletedAt !== null`), returns HTTP 404/410.
-   * `POST /api/v1/tickets/:id/attachments/:attachmentId/remove` (or `DELETE`): Validates requester ownership and non-empty removal reason. In a single Prisma transaction, marks `deletedAt = now()` and `deletedById = currentRequester.id`, and appends `ATTACHMENT_REMOVED` TicketEvent. Immediately deletes binary file from storage.
+   * `GET /api/v1/tickets/:id/attachments/:attachmentId`: Authorizes requester; streams active binary. If soft-removed (`isRemoved === true` or `removedAt !== null`), returns HTTP 404/410.
+   * `POST /api/v1/tickets/:id/attachments/:attachmentId/remove` (or `DELETE`): Validates requester ownership and non-empty removal reason. In a single Prisma transaction, marks `isRemoved = true`, `removedAt = now()`, `removalReason = reason`, and `removedByRequesterId = currentRequester.id`, and appends `ATTACHMENT_REMOVED` TicketEvent. Immediately deletes binary file from storage.
 4. **Frontend UI (Ticket Detail & Attachment Screen):**
    * Responsive layout conforming to Zen Green UI guidelines (Section 8.5 & 8.7).
    * Read-only presentation of ticket attributes: Ticket No, Created Date, Category, Related System, Requester, Requested Priority, IT Priority, Current Status, Ticket Owner, Summary, Description, Resolution Summary.
@@ -236,7 +237,7 @@ graph TD
 * **AC-05-02 (Cross-Requester Ticket Protection):** Given Requester B is selected, when Requester B attempts to access Ticket 1 (owned by Requester A) via API or direct navigation, then the request is rejected with HTTP 403/404 and no ticket details are revealed.
 * **AC-05-03 (Attachment Upload Validation & Limits):** Given an attachment file exceeding 5MB, an unsupported file extension (e.g. `.exe`, `.txt`), or an upload to a ticket that already has 5 active files, when upload is attempted, then the request is rejected with a descriptive error message and the file is not stored.
 * **AC-05-04 (Mandatory Removal Reason):** Given an active attachment owned by the requester, when the user clicks Remove, then a confirmation dialog appears requiring a non-empty removal reason before removal can be confirmed.
-* **AC-05-05 (Soft-Removal Transaction & Binary Deletion):** Given a confirmed attachment removal with reason, when processed, then the attachment row is updated with `deletedAt` and `deletedById`, an `ATTACHMENT_REMOVED` TicketEvent is persisted in the same transaction, the physical binary is deleted from storage, and subsequent download attempts return HTTP 404/410.
+* **AC-05-05 (Soft-Removal Transaction & Binary Deletion):** Given a confirmed attachment removal with reason, when processed, then the attachment row is updated with `isRemoved = true`, `removalReason`, `removedAt`, and `removedByRequesterId`, an `ATTACHMENT_REMOVED` TicketEvent is persisted in the same transaction, the physical binary is deleted from storage, and subsequent download attempts return HTTP 404/410.
 * **AC-05-06 (Cross-Requester Attachment Protection):** Given Requester B is selected, when Requester B attempts to download an attachment from a ticket owned by Requester A, then the download is rejected with HTTP 403/404.
 
 ---
