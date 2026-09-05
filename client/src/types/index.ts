@@ -26,6 +26,44 @@ export interface Category {
   updatedAt?: string;
 }
 
+export interface Attachment {
+  id: number;
+  ticketId?: number;
+  originalFilename: string;
+  storedFilename?: string;
+  mimeType: string;
+  fileSize: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Ticket {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  description: string;
+  categoryId: number;
+  categoryName?: string;
+  relatedSystemId: number;
+  relatedSystemName?: string;
+  requestedPriority: "Low" | "Medium" | "High" | "Urgent" | string;
+  itPriority?: string | null;
+  currentStatus: string;
+  requesterId: number;
+  requesterName?: string;
+  createdAt: string;
+  updatedAt: string;
+  attachments?: Attachment[];
+}
+
+export interface CreateTicketPayload {
+  summary: string;
+  description: string;
+  categoryId: number;
+  relatedSystemId: number;
+  requestedPriority: "Low" | "Medium" | "High" | "Urgent" | string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T;

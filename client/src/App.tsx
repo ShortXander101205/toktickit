@@ -4,6 +4,8 @@ import { AppHeader } from "./components/AppHeader.js";
 import { RequesterSelector } from "./components/RequesterSelector.js";
 import { checkSystem, Category } from "./api.js";
 
+import { CreateTicket } from "./components/CreateTicket.js";
+
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
@@ -42,61 +44,70 @@ function MainApp() {
       <main className="container-xl py-4 flex-grow-1" style={{ maxWidth: "1200px" }}>
         {currentRequester ? (
           <div>
-            {/* Active Requester Welcome Banner */}
-            <div
-              className="card border-0 shadow-sm p-4 mb-4"
-              style={{
-                borderRadius: "8px",
-                backgroundColor: "var(--color-surface-card)",
-                borderLeft: "6px solid var(--color-primary-green)",
-              }}
-            >
-              <div className="d-flex align-items-center justify-content-between">
-                <div>
-                  <h2 className="h4 fw-bold mb-1" style={{ color: "var(--color-text-primary)" }}>
-                    Welcome, {currentRequester.name}
-                  </h2>
-                  <p className="text-muted small mb-0">
-                    Logged in as <strong>{currentRequester.email}</strong> • Active Testing Persona
-                  </p>
+            {activeTab === "create-ticket" ? (
+              <CreateTicket
+                onSuccess={() => setActiveTab("my-tickets")}
+                onCancel={() => setActiveTab("my-tickets")}
+              />
+            ) : (
+              <>
+                {/* Active Requester Welcome Banner */}
+                <div
+                  className="card border-0 shadow-sm p-4 mb-4"
+                  style={{
+                    borderRadius: "8px",
+                    backgroundColor: "var(--color-surface-card)",
+                    borderLeft: "6px solid var(--color-primary-green)",
+                  }}
+                >
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div>
+                      <h2 className="h4 fw-bold mb-1" style={{ color: "var(--color-text-primary)" }}>
+                        Welcome, {currentRequester.name}
+                      </h2>
+                      <p className="text-muted small mb-0">
+                        Logged in as <strong>{currentRequester.email}</strong> • Active Testing Persona
+                      </p>
+                    </div>
+                    <span className="badge bg-success py-2 px-3">Active Requester</span>
+                  </div>
                 </div>
-                <span className="badge bg-success py-2 px-3">Active Requester</span>
-              </div>
-            </div>
 
-            {/* Quick Actions & Placeholder for Features 3 & 4 */}
-            <div className="row g-4 mb-4">
-              <div className="col-md-6">
-                <div className="card h-100 border-0 shadow-sm p-4" style={{ borderRadius: "8px" }}>
-                  <h3 className="h5 fw-bold mb-2">My Tickets</h3>
-                  <p className="text-muted small mb-3">
-                    View, filter, and track all IT service desk tickets submitted under your persona.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary w-auto align-self-start"
-                    onClick={() => setActiveTab("my-tickets")}
-                  >
-                    Go to My Tickets (Feature 4)
-                  </button>
+                {/* Quick Actions & Placeholder for Features 3 & 4 */}
+                <div className="row g-4 mb-4">
+                  <div className="col-md-6">
+                    <div className="card h-100 border-0 shadow-sm p-4" style={{ borderRadius: "8px" }}>
+                      <h3 className="h5 fw-bold mb-2">My Tickets</h3>
+                      <p className="text-muted small mb-3">
+                        View, filter, and track all IT service desk tickets submitted under your persona.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary w-auto align-self-start"
+                        onClick={() => setActiveTab("my-tickets")}
+                      >
+                        Go to My Tickets (Feature 4)
+                      </button>
+                    </div>
+                  </div>
+                  <div className="col-md-6">
+                    <div className="card h-100 border-0 shadow-sm p-4" style={{ borderRadius: "8px" }}>
+                      <h3 className="h5 fw-bold mb-2">+ Create Ticket</h3>
+                      <p className="text-muted small mb-3">
+                        Submit a new support incident or hardware/software service request.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-primary-green w-auto align-self-start"
+                        onClick={() => setActiveTab("create-ticket")}
+                      >
+                        Open Ticket Form (Feature 3)
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="col-md-6">
-                <div className="card h-100 border-0 shadow-sm p-4" style={{ borderRadius: "8px" }}>
-                  <h3 className="h5 fw-bold mb-2">+ Create Ticket</h3>
-                  <p className="text-muted small mb-3">
-                    Submit a new support incident or hardware/software service request.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn btn-primary-green w-auto align-self-start"
-                    onClick={() => setActiveTab("create-ticket")}
-                  >
-                    Open Ticket Form (Feature 3)
-                  </button>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         ) : null}
 

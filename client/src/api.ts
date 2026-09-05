@@ -1,4 +1,4 @@
-import { RequesterUser, RelatedSystem, Category, ApiResponse } from "./types/index.js";
+import { RequesterUser, RelatedSystem, Category, ApiResponse, Ticket, CreateTicketPayload } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -48,6 +48,59 @@ export async function fetchCategories(): Promise<Category[]> {
   }
   const json: ApiResponse<Category[]> = await res.json();
   return json.data;
+}
+
+// Create Ticket with optional attachments
+export async function createTicket(
+  payload: CreateTicketPayload,
+  attachments: File[] = [],
+  activeRequesterId: number
+): Promise<ApiResponse<Ticket>> {
+  const url = `${API_URL}/api/tickets`;
+  let body: BodyInit;
+  const headers: Record<string, string> = {
+    "x-requester-id": String(activeRequesterId),
+  };
+
+  if (attachments.length > 0) {
+    const formData = new FormData();
+    formData.append("summary", payload.summary);
+    formData.append("description", payload.description);
+    formData.append("categoryId", String(payload.categoryId));
+    formData.append("relatedSystemId", String(payload.relatedSystemId));
+    formData.append("requestedPriority", payload.requestedPriority);
+    for (const file of attachments) {
+      formData.append("attachments", file);
+    }
+    body = formData;
+  } else {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(payload);
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  const json: ApiResponse<Ticket> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Ticket creation failed (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json;
 }
 
 // Lab 1 backward compatibility method

@@ -4,7 +4,7 @@
 **Sprint / Milestone:** TokTickIT Lab 2 (Sprint 2) — Requester MVP (Sprint Issue 3)  
 **Target Branch:** `feature/7-create-ticket` (Base: `lab2-staging`)  
 **Specification Version:** 1.0.0  
-**Status:** DRAFT CONTRACT (AWAITING HUMAN REVIEW)  
+**Status:** APPROVED ENGINEERING CONTRACT  
 
 ---
 
@@ -132,23 +132,25 @@ erDiagram
     * `year` (`Int`, Primary Key)
     * `nextVal` (`Int`, next counter value to be assigned)
 * **Transactional Concurrency Logic:**
-  * Ticket number allocation occurs strictly inside a PostgreSQL transaction (`prisma.$transaction`) executing serializable or locked row updates:
+  * Ticket number allocation occurs strictly inside a PostgreSQL transaction (`prisma.$transaction`) executing an atomic upsert/increment:
     ```typescript
-    export async function generateTicketNumber(tx: Prisma.TransactionClient): Promise<string> {
-      const currentYear = new Date().getUTCFullYear();
+    export async function generateTicketNumber(
+      tx: Prisma.TransactionClient,
+      yearOverride?: number
+    ): Promise<string> {
+      const currentYear = yearOverride ?? new Date().getUTCFullYear();
       
-      // Upsert annual sequence counter atomically
-      const sequence = await tx.ticketNumberSequence.upsert({
-        where: { year: currentYear },
-        update: { nextVal: { increment: 1 } },
-        create: { year: currentYear, nextVal: 2 }, // 1 is assigned, nextVal becomes 2
-      });
+      // Atomically insert or increment annual sequence counter in PostgreSQL
+      const result = await tx.$queryRawUnsafe<{ assignedVal: number }[]>(
+        `INSERT INTO ticket_number_sequences (year, "nextVal")
+         VALUES ($1, 2)
+         ON CONFLICT (year)
+         DO UPDATE SET "nextVal" = ticket_number_sequences."nextVal" + 1
+         RETURNING "nextVal" - 1 AS "assignedVal";`,
+        currentYear
+      );
 
-      // If record was just created, assigned value is 1; otherwise, nextVal - 1
-      const assignedSeq = sequence.nextVal === 2 
-        ? 1 
-        : sequence.nextVal - 1;
-
+      const assignedSeq = result[0].assignedVal;
       const paddedNumber = String(assignedSeq).padStart(5, '0');
       return `TKT-${currentYear}-${paddedNumber}`;
     }
@@ -282,11 +284,11 @@ Used when creating a ticket with 1 to 5 attachments.
 * **Form Fields:**
   * `summary` (`string`): Problem summary (5–100 characters).
   * `description` (`string`): Problem description (10–2000 characters).
-  * `categoryId` (`string` / `number`): ID of selected Category.
-  * `relatedSystemId` (`string` / `number`): ID of selected Related System.
+  * `categoryId` (`string` / `number`): ID of selected Category (server explicitly coerces to integer).
+  * `relatedSystemId` (`string` / `number`): ID of selected Related System (server explicitly coerces to integer).
   * `requestedPriority` (`string`): Priority (`Low`, `Medium`, `High`, `Urgent`).
 * **File Part(s):**
-  * Field name: `attachments` or `files` (array of 1 to 5 files, each $\le 5\text{ MB}$, JPG/PNG/WEBP/PDF).
+  * Field name: strictly `attachments` (array of 1 to 5 files, each $\le 5\text{ MB}$, JPG/PNG/WEBP/PDF).
 
 ---
 
@@ -497,11 +499,13 @@ The Create Ticket form strictly inherits the CSS variables defined in `client/sr
 
 ### 6.4 Developer Work Norm: Blur Validation Rule & Submit Error Placement
 To conform strictly with workspace engineering work norms (`AGENTS.md`):
-1. **Blur Validation Rule:**
-   * During general data entry, if a user enters an invalid format into a field and triggers `onBlur`, invalid inputs clear/blank out on blur.
-   * For file selection: if an invalid file (e.g. `6MB` file or `.txt` file) is picked, the file input clears/drops the invalid file on change/blur and alerts the user.
-2. **Submit-Triggered Validation:**
+1. **Blur Validation Rule (`onBlur`):**
+   * During general data entry, if a user enters invalid characters or pure whitespace (e.g., `"   "`), the input clears/blanks out on blur to maintain data hygiene.
+   * Partial non-whitespace input (such as `"Fail"` or `"Short"`) is retained on blur so users can edit incrementally.
+   * For file selection: if an unpermitted file (e.g. `6MB` file or `.txt` file) is picked, the file selector rejects and drops the invalid file immediately on change/blur and alerts the user without staging it.
+2. **Submit-Triggered Validation (`onSubmit`):**
    * Field-level validation messages and red borders are **only displayed upon clicking the explicit "Submit Ticket" button**.
+   * Validation evaluates presence (empty fields $\rightarrow$ AC-02) and length boundaries (Summary 5–100 chars, Description 10–2000 chars $\rightarrow$ AC-03).
    * Validation messages are placed **immediately below** the invalid input field in Dark Red text (`#B3261E`, `0.75rem`, `font-weight: 500`) with an exclamation circle SVG icon (**DEC-UI-13**).
    * Input border transitions to `border: 1px solid var(--color-danger)`.
 
@@ -840,8 +844,9 @@ describe('API: POST /api/tickets (Feature 7 Create Ticket)', () => {
           contentType: 'application/pdf',
         });
 
-      expect([413, 422]).toContain(res.status);
+      expect(res.status).toBe(422);
       expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('FILE_TOO_LARGE');
     });
   });
 });
