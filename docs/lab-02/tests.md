@@ -36,7 +36,7 @@ graph TD
 | **UNIT-02** | Unit | BR-01 | Ticket Number annual sequence reset | Resets sequence to 1 when year increments | `server/tests/lab-02/ticket-number.test.ts` | Planned |
 | **UNIT-03** | Unit | BR-06, AC-14 | Attachment file validator utility | Validates extension & MIME; rejects invalid types & size > 5MB | `server/tests/lab-02/attachment-validator.test.ts` | Planned |
 | **API-01** | API | FR-01, AC-05 | `GET /api/development-requesters` | 200 OK; returns only active requesters (`isActive: true`) | `server/tests/lab-02/requesters.api.test.ts` | Planned |
-| **API-02** | API | FR-04, BR-02, AC-01 | `POST /api/tickets` (Valid submission) | 201 Created; returns Ticket with unique `ticketNo`, `status: NEW` | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
+| **API-02** | API | FR-04, BR-02, AC-01 | `POST /api/tickets` (Valid submission) | 201 Created; returns Ticket with unique `ticketNumber`, `currentStatus: New` | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | **API-03** | API | BR-05, AC-02, AC-03 | `POST /api/tickets` (Validation boundaries) | 422 Unprocessable; rejects missing fields & length violations | `server/tests/lab-02/create-ticket.api.test.ts` | Planned |
 | **API-04** | API | FR-06, BR-08, AC-07 | `GET /api/tickets` (Requester isolation) | 200 OK; strictly returns tickets matching `x-requester-id` | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
 | **API-05** | API | FR-07, FR-08, AC-08, AC-09 | `GET /api/tickets` (Search, filter, page) | 200 OK; returns filtered results and pagination metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Planned |
@@ -44,7 +44,7 @@ graph TD
 | **API-07** | API | FR-15, BR-08, AC-12 | `GET /api/tickets/:id` (Cross-requester access) | 403 or 404; denies access when ticket belongs to another user | `server/tests/lab-02/ticket-detail.api.test.ts` | Planned |
 | **API-08** | API | FR-10, BR-06, AC-13, AC-15 | `POST /api/tickets/:id/attachments` (Upload & limits) | 201 Created; rejects 6th file or files > 5MB with 422 | `server/tests/lab-02/attachments.api.test.ts` | Planned |
 | **API-09** | API | FR-11, AC-18 | `GET /api/attachments/:id/download` | 200 OK with binary stream; 403 if requester not owner | `server/tests/lab-02/attachments.api.test.ts` | Planned |
-| **API-10** | API | FR-12, FR-13, FR-14, AC-16, AC-17 | `DELETE /api/attachments/:id` (Soft-removal) | 200 OK; records reason, sets `deletedAt`, deletes file; download 410 | `server/tests/lab-02/attachments.api.test.ts` | Planned |
+| **API-10** | API | FR-12, FR-13, FR-14, AC-16, AC-17 | `DELETE /api/attachments/:id` (Soft-removal) | 200 OK; records reason, sets `isRemoved = true`, `removedAt`, `removedByRequesterId`, deletes file; download 410 | `server/tests/lab-02/attachments.api.test.ts` | Planned |
 | **UI-01** | UI | FR-01, AC-04, AC-05 | Requester Selector modal & active filter | Displays active requesters; blocks main UI if unselected | `client/tests/lab-02/RequesterSelector.test.tsx` | Planned |
 | **UI-02** | UI | FR-02, AC-06 | Requester context switching | Header shows user; switching clears and reloads ticket view | `client/tests/lab-02/RequesterContext.test.tsx` | Planned |
 | **UI-03** | UI | BR-05, AC-02, AC-03 | Create Ticket form inline validation | Field errors appear under inputs; API is not called | `client/tests/lab-02/CreateTicket.test.tsx` | Planned |

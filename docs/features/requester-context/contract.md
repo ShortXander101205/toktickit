@@ -12,7 +12,7 @@
 
 ### 1.1 Purpose
 This engineering contract governs the implementation of **Feature 2: Development Requester Context & Database Foundation**. The feature delivers:
-1. The authoritative **PostgreSQL relational database schema** using Prisma ORM for the TokTickIT core domain models (`RequesterUser`, `RelatedSystem`, `Category`, `Ticket`, `Attachment`, and `TicketSequence`).
+1. The authoritative **PostgreSQL relational database schema** using Prisma ORM for the TokTickIT core domain models (`RequesterUser`, `RelatedSystem`, `Category`, `Ticket`, `Attachment`, and `TicketNumberSequence`).
 2. An **idempotent database seeding script** (`server/prisma/seed.ts`) that populates required reference catalogs and development user identities safely without duplicate key violations or PostgreSQL sequence desynchronization.
 3. Three unauthenticated **REST reference data endpoints** (`GET /api/requesters`, `GET /api/related-systems`, and `GET /api/categories`) enabling the client SPA to retrieve required master records.
 4. The **Development Requester Context Selector** component, global state provider (`RequesterContext`), and application header integration adhering strictly to KMUTT's **Zen Green** visual design standard and `Lab_02_labsheet.pdf` (Section 8.1, Figure on p. 9).
@@ -20,7 +20,7 @@ This engineering contract governs the implementation of **Feature 2: Development
 This feature establishes the baseline identity context for all subsequent Lab 2 requester operations (Ticket Creation, My Tickets listing, and Attachment management).
 
 ### 1.2 In-Scope Capabilities
-* **Prisma Schema Definition:** Defining structural fields, data types, constraints, defaults, and foreign-key relations for `RequesterUser`, `RelatedSystem`, `Category`, `Ticket`, `Attachment`, and `TicketSequence` in `server/prisma/schema.prisma`.
+* **Prisma Schema Definition:** Defining structural fields, data types, constraints, defaults, and foreign-key relations for `RequesterUser`, `RelatedSystem`, `Category`, `Ticket`, `Attachment`, and `TicketNumberSequence` in `server/prisma/schema.prisma`.
 * **Idempotent Seeding Pipeline:** Safe, repeatable upsert logic seeding 4 Categories, 7 Related Systems, 4 Active Development Requesters, and 1 Inactive Development Requester, exporting a programmatic `seed(prisma)` function and performing PostgreSQL autoincrement sequence synchronization.
 * **Reference Data APIs:**
   * `GET /api/requesters` (queries PostgreSQL, strictly filters `where: { isActive: true }`, orders by name). Alias `/api/development-requesters` maintained for full spec compatibility.
@@ -54,12 +54,12 @@ To prevent assumptions or premature architecture creep, the following capabiliti
 
 ## 2. Data Model Design (Prisma)
 
-The persistence layer is implemented in PostgreSQL via Prisma ORM (`server/prisma/schema.prisma`). All primary entities utilize explicit primary keys, UTC timestamps, optimistic concurrency protection, and referential integrity constraints.
+The persistence layer is implemented in PostgreSQL via Prisma ORM (`server/prisma/schema.prisma`). All primary entities utilize explicit integer primary keys (`autoincrement()`), UTC timestamps, referential integrity constraints, and camelCase database column conventions aligned with the peer reviewer and course standard.
 
 ```mermaid
 erDiagram
-    RequesterUser ||--o{ Ticket : "requests"
-    RequesterUser ||--o{ Attachment : "removes"
+    RequesterUser ||--o{ Ticket : "requests (RequesterTickets)"
+    RequesterUser ||--o{ Attachment : "removes (RequesterRemovedAttachments)"
     Category ||--o{ Ticket : "categorizes"
     RelatedSystem ||--o{ Ticket : "relates to"
     Ticket ||--o{ Attachment : "contains"
@@ -68,6 +68,7 @@ erDiagram
         int id PK
         string name
         string email UK
+        string department
         boolean isActive
         datetime createdAt
         datetime updatedAt
@@ -92,24 +93,23 @@ erDiagram
     }
 
     Ticket {
-        string id PK
+        int id PK
         string ticketNumber UK
         int requesterId FK
         int categoryId FK
         int relatedSystemId FK
         string summary
         string description
-        Priority requestedPriority
-        Priority itPriority
-        TicketStatus currentStatus
-        int version
+        string requestedPriority
+        string itPriority
+        string currentStatus
         datetime createdAt
         datetime updatedAt
     }
 
     Attachment {
-        string id PK
-        string ticketId FK
+        int id PK
+        int ticketId FK
         string originalFilename
         string storedFilename UK
         string mimeType
@@ -119,34 +119,21 @@ erDiagram
         datetime removedAt
         int removedByRequesterId FK
         datetime createdAt
+        datetime updatedAt
     }
 
-    TicketSequence {
+    TicketNumberSequence {
         int year PK
-        int lastNumber
+        int nextVal
     }
 ```
 
-### 2.1 Enums
+### 2.1 Priority & Status Standards
 
-```prisma
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
+To ensure database schema interoperability across peer reviewer workstations without custom PostgreSQL enum dependencies, ticket priorities and lifecycle statuses are stored as `String` columns in PostgreSQL, with values validated by domain services:
 
-enum TicketStatus {
-  NEW
-  ASSIGNED
-  IN_PROGRESS
-  PENDING_REQUESTER
-  RESOLVED
-  CLOSED
-  CANCELLED
-}
-```
+* **`requestedPriority` & `itPriority` Values:** `"Low"`, `"Medium"`, `"High"`, `"Urgent"` (default: `"Medium"`).
+* **`currentStatus` Values:** `"New"`, `"Assigned"`, `"In Progress"`, `"Pending Requester"`, `"Resolved"`, `"Closed"`, `"Cancelled"` (default: `"New"`).
 
 ### 2.2 Model Specifications
 
@@ -155,16 +142,17 @@ Represents an authorized university requester (student, faculty, or staff) parti
 
 ```prisma
 model RequesterUser {
-  id        Int      @id @default(autoincrement())
-  name      String   @map("name")
-  email     String   @unique @map("email")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                 Int          @id @default(autoincrement())
+  name               String
+  email              String       @unique
+  department         String?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  // Relations
-  tickets            Ticket[]
-  removedAttachments Attachment[] @relation("RemovedByRequester")
+  // Relational Integrity
+  tickets            Ticket[]     @relation("RequesterTickets")
+  removedAttachments Attachment[] @relation("RequesterRemovedAttachments")
 
   @@map("requester_users")
 }
@@ -172,8 +160,9 @@ model RequesterUser {
 
 * **Field Specifications:**
   * `id`: `Int` (Autoincrementing primary key).
-  * `name`: `String` (Full display name, e.g., "Jennifer Anderson").
+  * `name`: `String` (Full display name, e.g., "Jennifer Anderson" / "Sompong IT").
   * `email`: `String` (Unique institutional email, case-insensitive comparison enforced via lowercase normalization in domain service).
+  * `department`: `String?` (Optional department identifier, e.g., "Information Technology Office").
   * `isActive`: `Boolean` (Default `true`. Soft-deactivation flag; inactive users are strictly excluded from the context selector).
   * `createdAt`: `DateTime` (Automatic UTC timestamp).
   * `updatedAt`: `DateTime` (Automatic UTC timestamp updated on mutation).
@@ -184,13 +173,13 @@ Reference catalog of IT systems, services, or platforms affected by support inci
 ```prisma
 model RelatedSystem {
   id        Int      @id @default(autoincrement())
-  name      String   @unique @map("name")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  // Relations
-  tickets Ticket[]
+  // Relational Integrity
+  tickets   Ticket[]
 
   @@map("related_systems")
 }
@@ -208,15 +197,15 @@ Functional ticket classification domain taxonomy.
 ```prisma
 model Category {
   id          Int      @id @default(autoincrement())
-  code        String   @unique @map("code")
-  name        String   @unique @map("name")
-  description String?  @map("description")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  code        String?  @unique
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  // Relations
-  tickets Ticket[]
+  // Relational Integrity
+  tickets     Ticket[]
 
   @@map("categories")
 }
@@ -224,7 +213,7 @@ model Category {
 
 * **Field Specifications:**
   * `id`: `Int` (Autoincrementing primary key, preserves Lab 1 compatibility).
-  * `code`: `String` (Unique short code, e.g., "ACC", "HW", "SW", "NET").
+  * `code`: `String?` (Unique short code, e.g., "ACC", "HW", "SW", "NET").
   * `name`: `String` (Unique human-readable title, e.g., "Account and Access").
   * `description`: `String?` (Optional descriptive text explaining category scope).
   * `isActive`: `Boolean` (Default `true`. Allows deactivating categories without breaking historical ticket foreign keys).
@@ -235,47 +224,42 @@ Core service desk incident or request record.
 
 ```prisma
 model Ticket {
-  id                String       @id @default(uuid()) @map("id")
-  ticketNumber      String       @unique @map("ticket_number")
-  requesterId       Int          @map("requester_id")
-  categoryId        Int          @map("category_id")
-  relatedSystemId   Int          @map("related_system_id")
-  summary           String       @db.VarChar(100) @map("summary")
-  description       String       @db.VarChar(2000) @map("description")
-  requestedPriority Priority     @default(MEDIUM) @map("requested_priority")
-  itPriority        Priority     @default(MEDIUM) @map("it_priority")
-  currentStatus     TicketStatus @default(NEW) @map("current_status")
-  version           Int          @default(1) @map("version")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  id                Int           @id @default(autoincrement())
+  ticketNumber      String        @unique @db.VarChar(32) // Format: TKT-YYYY-NNNNN
+  requesterId       Int
+  categoryId        Int
+  relatedSystemId   Int
+  summary           String        @db.VarChar(100)
+  description       String        @db.Text
+  requestedPriority String        // Low, Medium, High, Urgent
+  itPriority        String?       // Low, Medium, High, Urgent
+  currentStatus     String        @default("New")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   // Relations
-  requester     RequesterUser @relation(fields: [requesterId], references: [id], onDelete: Restrict)
-  category      Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  relatedSystem RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
-  attachments   Attachment[]
+  requester         RequesterUser @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  attachments       Attachment[]
 
   @@index([requesterId])
   @@index([currentStatus])
-  @@index([categoryId])
-  @@index([relatedSystemId])
-  @@index([createdAt])
   @@map("tickets")
 }
 ```
 
 * **Field Specifications:**
-  * `id`: `String` (UUID primary key generated by `@default(uuid())`).
-  * `ticketNumber`: `String` (Unique human-readable format `TKT-YYYY-NNNNN`).
+  * `id`: `Int` (Autoincrementing integer primary key).
+  * `ticketNumber`: `String` (Unique human-readable format `TKT-YYYY-NNNNN`, `@db.VarChar(32)`).
   * `requesterId`: `Int` (FK referencing `RequesterUser.id`).
   * `categoryId`: `Int` (FK referencing `Category.id`).
   * `relatedSystemId`: `Int` (FK referencing `RelatedSystem.id`).
   * `summary`: `String` (Short problem summary, constrained to 5–100 characters).
-  * `description`: `String` (Detailed problem description, constrained to 10–2000 characters).
-  * `requestedPriority`: `Priority` (Enum: `LOW`, `MEDIUM`, `HIGH`, `URGENT`, default `MEDIUM`).
-  * `itPriority`: `Priority` (Enum: `LOW`, `MEDIUM`, `HIGH`, `URGENT`, default `MEDIUM`).
-  * `currentStatus`: `TicketStatus` (Enum: `NEW`, `ASSIGNED`, `IN_PROGRESS`, `PENDING_REQUESTER`, `RESOLVED`, `CLOSED`, `CANCELLED`, default `NEW`).
-  * `version`: `Int` (Default `1`. Optimistic concurrency token per System SDS v1.0 p. 9; increments atomically on updates to prevent dirty writes).
+  * `description`: `String` (Detailed problem description, `@db.Text`).
+  * `requestedPriority`: `String` (Domain-validated: `"Low"`, `"Medium"`, `"High"`, `"Urgent"`).
+  * `itPriority`: `String?` (Nullable staff priority: `"Low"`, `"Medium"`, `"High"`, `"Urgent"`).
+  * `currentStatus`: `String` (Default `"New"`, domain-validated lifecycle statuses).
   * `createdAt` / `updatedAt`: `DateTime` (Automatic UTC timestamps).
 
 #### 5. `Attachment`
@@ -283,50 +267,51 @@ Uploaded supporting files bound to a ticket, supporting soft-removal auditabilit
 
 ```prisma
 model Attachment {
-  id                   String    @id @default(uuid()) @map("id")
-  ticketId             String    @map("ticket_id")
-  originalFilename     String    @map("original_filename")
-  storedFilename       String    @unique @map("stored_filename")
-  mimeType             String    @map("mime_type")
-  fileSize             Int       @map("file_size")
-  isRemoved            Boolean   @default(false) @map("is_removed")
-  removalReason        String?   @db.VarChar(500) @map("removal_reason")
-  removedAt            DateTime? @map("removed_at")
-  removedByRequesterId Int?      @map("removed_by_requester_id")
-  createdAt            DateTime  @default(now()) @map("created_at")
+  id                   Int            @id @default(autoincrement())
+  ticketId             Int
+  originalFilename     String
+  storedFilename       String         @unique
+  mimeType             String
+  fileSize             Int            // Size in bytes
+  isRemoved            Boolean        @default(false)
+  removalReason        String?        @db.Text
+  removedAt            DateTime?
+  removedByRequesterId Int?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
   // Relations
-  ticket             Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  removedByRequester RequesterUser? @relation("RemovedByRequester", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
+  ticket               Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  removedByRequester   RequesterUser? @relation("RequesterRemovedAttachments", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
 
   @@index([ticketId])
-  @@index([isRemoved])
   @@map("attachments")
 }
 ```
 
 * **Field Specifications:**
-  * `id`: `String` (UUID primary key).
-  * `ticketId`: `String` (FK referencing `Ticket.id`).
+  * `id`: `Int` (Autoincrementing integer primary key).
+  * `ticketId`: `Int` (FK referencing `Ticket.id`).
   * `originalFilename`: `String` (Sanitized client filename, e.g., "vpn_error.png").
   * `storedFilename`: `String` (**`@unique`** generated internal storage key / file identifier, e.g., `<uuid>.png`, preventing duplicate storage collisions).
   * `mimeType`: `String` (Validated MIME type: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`).
   * `fileSize`: `Int` (Size in bytes; maximum permitted 5,242,880 bytes / 5 MB).
   * `isRemoved`: `Boolean` (Default `false`. Soft-removal flag).
-  * `removalReason`: `String?` (Required upon soft-removal, min 5 chars, enforced by domain service layer).
+  * `removalReason`: `String?` (Required upon soft-removal, min 5 chars, `@db.Text`).
   * `removedAt`: `DateTime?` (Timestamp when soft-removal occurred).
   * `removedByRequesterId`: `Int?` (FK referencing `RequesterUser.id`).
   * `createdAt`: `DateTime` (Upload timestamp).
+  * `updatedAt`: `DateTime` (Update timestamp).
 
-#### 6. `TicketSequence`
+#### 6. `TicketNumberSequence`
 Foundational annual sequence counter for atomic `TKT-YYYY-NNNNN` generation.
 
 ```prisma
-model TicketSequence {
-  year       Int @id @map("year")
-  lastNumber Int @default(0) @map("last_number")
+model TicketNumberSequence {
+  year    Int @id
+  nextVal Int @default(1)
 
-  @@map("ticket_sequences")
+  @@map("ticket_number_sequences")
 }
 ```
 
@@ -435,14 +420,25 @@ if (require.main === module) {
 | 6 | `Printer` | Departmental networked multi-function printers and papercut billing | `true` |
 | 7 | `Corporate Laptop` | University-issued faculty and staff Windows and macOS devices | `true` |
 
-#### Development Requesters (4 Active, 1 Inactive — meets "at least 4 active & at least 1 inactive")
-| ID | Name | Email | isActive | Purpose / Persona |
+#### Development Requesters (Inclusive Seed Catalog: 8 Active, 2 Inactive)
+
+##### Thai Development Personas (Peer Reviewer Program)
+| Name | Email | Department | isActive | Purpose / Persona |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | `Jennifer Anderson` | `jennifer.anderson@kmutt.ac.th` | `true` | Faculty / Engineering Professor (Primary Happy-Path persona) |
-| 2 | `Michael Brown` | `michael.brown@kmutt.ac.th` | `true` | Staff / Administrative Officer (Cross-user isolation test persona) |
-| 3 | `David Lee` | `david.lee@kmutt.ac.th` | `true` | Teaching Assistant / Graduate Student (Multi-ticket persona) |
-| 4 | `Sarah Johnson` | `sarah.johnson@kmutt.ac.th` | `true` | Undergraduate Student (Zero-ticket empty state persona) |
-| 5 | `Inactive Test User` | `inactive.user@kmutt.ac.th` | `false` | Deactivated Staff (Must be strictly filtered out by API & UI) |
+| `Sompong IT` | `sompong.it@kmutt.ac.th` | Information Technology Office | `true` | IT Staff persona (Peer compatibility) |
+| `Anong Staff` | `anong.sta@kmutt.ac.th` | Academic Affairs Office | `true` | Academic staff persona (Peer compatibility) |
+| `Kittisak Student` | `kittisak.stu@kmutt.ac.th` | Computer Engineering Dept | `true` | Student persona (Peer compatibility) |
+| `Wichai Faculty` | `wichai.fac@kmutt.ac.th` | Department of Mathematics | `true` | Faculty persona (Peer compatibility) |
+| `Prasert Inactive` | `prasert.ina@kmutt.ac.th` | Human Resources Office | `false` | Inactive HR persona (Filtered out) |
+
+##### Baseline Development Personas
+| Name | Email | Department | isActive | Purpose / Persona |
+| :--- | :--- | :--- | :--- | :--- |
+| `Jennifer Anderson` | `jennifer.anderson@kmutt.ac.th` | Computer Engineering | `true` | Faculty / Professor (Primary Happy-Path persona) |
+| `Michael Brown` | `michael.brown@kmutt.ac.th` | Information Technology | `true` | Staff / Admin Officer (Cross-user isolation persona) |
+| `David Lee` | `david.lee@kmutt.ac.th` | Electrical Engineering | `true` | Teaching Assistant (Multi-ticket persona) |
+| `Sarah Johnson` | `sarah.johnson@kmutt.ac.th` | Science Faculty | `true` | Undergraduate Student (Zero-ticket empty state persona) |
+| `Inactive Test User` | `inactive.user@kmutt.ac.th` | Registrar Office | `false` | Deactivated Staff (Must be strictly filtered out) |
 
 ---
 
@@ -1052,18 +1048,19 @@ describe('Feature 2: RequesterSelector Component & Context', () => {
 ## 7. Traceability, Discrepancy Analysis & Open Clarifications
 
 ### 7.1 Cross-Document Reconciliation
-1. **Ticket Identifier Field:** Standardized on `ticketNumber` (`ticket_number` in database) across both API and Prisma schema.
-2. **Ticket Status Field:** Standardized on `currentStatus` (`current_status` in database) across API and Prisma schema.
-3. **Attachment Metadata Fields:** Standardized on `storedFilename` (`@unique`), `fileSize`, `isRemoved`, `removalReason`, `removedAt`, and `removedByRequesterId`.
-4. **API Endpoint Pathing:** Express routes register canonical `GET /api/requesters` and specification alias `GET /api/development-requesters`.
-5. **Modal Cancel Action Alignment:** Aligns 100% with `Lab_02_labsheet.pdf` (Figure on p. 9) by providing a Cancel button in Context-Switch mode while keeping Mandatory mode unclosable.
+1. **Ticket Identifier Field:** Standardized on `ticketNumber` across both API and Prisma schema.
+2. **Ticket Status Field:** Standardized on `currentStatus` with default `"New"` across API and Prisma schema.
+3. **Database Casing Conventions:** Standardized on camelCase column naming matching peer-reviewer database configurations.
+4. **Attachment Metadata Fields:** Standardized on `storedFilename` (`@unique`), `fileSize`, `isRemoved`, `removalReason`, `removedAt`, and `removedByRequesterId`.
+5. **API Endpoint Pathing:** Express routes register canonical `GET /api/requesters` and specification alias `GET /api/development-requesters`.
+6. **Modal Cancel Action Alignment:** Aligns 100% with `Lab_02_labsheet.pdf` (Figure on p. 9) by providing a Cancel button in Context-Switch mode while keeping Mandatory mode unclosable.
 
 ---
 
 ## 8. Definition of Ready (DoR) Checklist
-- [x] All 6 Prisma models (`RequesterUser`, `RelatedSystem`, `Category`, `Ticket`, `Attachment`, `TicketSequence`) fully specified with types, optimistic concurrency `version`, and unique constraints.
+- [x] All 6 Prisma models (`RequesterUser`, `RelatedSystem`, `Category`, `Ticket`, `Attachment`, `TicketNumberSequence`) fully specified with types and unique constraints.
 - [x] Exclusions (passwords, tokens, JWT, sessions, cookies, RBAC) explicitly locked down.
-- [x] Idempotent seed data parameters documented with exact 4 categories, 7 related systems, 4 active requesters, 1 inactive requester, sequence sync, and no-`deleteMany` rule.
+- [x] Idempotent seed data parameters documented with exact 4 categories, 7 related systems, inclusive active/inactive requesters, sequence sync, and no-`deleteMany` rule.
 - [x] API contracts for `GET /api/requesters`, `GET /api/related-systems`, and `GET /api/categories` completely specified with success and error payloads.
 - [x] Zen Green UI specifications documented for dual-mode modal, Cancel action in switch mode, Continue action, header persona badge, loading, empty, and error states.
 - [x] Software Test Specification (STS) defined with programmatic supertest and component test outlines mapped 1-to-1 to Acceptance Criteria.
