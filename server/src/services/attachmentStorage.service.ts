@@ -23,3 +23,31 @@ export async function saveAttachmentFile(
   await fs.promises.writeFile(filePath, buffer);
   return { storedFilename, filePath };
 }
+
+export function getAttachmentFilePath(storedFilename: string): string {
+  return path.join(STORAGE_DIR, storedFilename);
+}
+
+export async function attachmentFileExists(storedFilename: string): Promise<boolean> {
+  const filePath = getAttachmentFilePath(storedFilename);
+  try {
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteAttachmentFile(storedFilename: string): Promise<boolean> {
+  const filePath = getAttachmentFilePath(storedFilename);
+  try {
+    await fs.promises.unlink(filePath);
+    return true;
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+      return false; // File already deleted or does not exist
+    }
+    console.error(`Failed to delete physical attachment file: ${filePath}`, err);
+    throw err;
+  }
+}
