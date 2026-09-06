@@ -260,5 +260,205 @@ export async function handleCreateTicket(req: Request, res: Response) {
   }
 }
 
-// Register route with upload middleware
+const VALID_SORT_FIELDS = new Set(["ticketNumber", "createdAt", "updatedAt", "currentStatus"]);
+
+export async function handleGetTickets(req: Request, res: Response) {
+  const prisma = getPrisma();
+
+  // 1. Verify and extract requester ID from header
+  const rawRequesterId = req.headers["x-requester-id"];
+  if (!rawRequesterId) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "MISSING_REQUESTER_ID",
+        message: "The 'x-requester-id' header is required to identify the submitting requester.",
+        details: [],
+      },
+    });
+  }
+
+  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+  if (isNaN(requesterId)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_REQUESTER_ID",
+        message: "The 'x-requester-id' header must be a valid integer ID.",
+        details: [],
+      },
+    });
+  }
+
+  const requester = await prisma.requesterUser.findUnique({
+    where: { id: requesterId },
+  });
+
+  if (!requester || !requester.isActive) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: "REQUESTER_NOT_FOUND",
+        message: "Requester not found or is inactive.",
+        details: [],
+      },
+    });
+  }
+
+  // 2. Parse and validate query parameters (defense-in-depth: ignore req.query.requesterId)
+  const { search, category, categoryId: rawCatId, requestedPriority, itPriority, status, sortBy: rawSortBy, sortOrder: rawSortOrder, page: rawPage, pageSize: rawPageSize } = req.query;
+
+  // Category filter
+  const targetCategory = category ?? rawCatId;
+  let parsedCategoryId: number | undefined;
+  if (targetCategory !== undefined && targetCategory !== "") {
+    parsedCategoryId = parseInt(String(targetCategory), 10);
+    if (isNaN(parsedCategoryId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_QUERY_PARAMETER",
+          message: "Category ID must be a valid integer.",
+          details: [{ field: "category", message: "Category ID must be an integer." }],
+        },
+      });
+    }
+  }
+
+  // Requested Priority filter
+  let normalizedReqPriority: string | undefined;
+  if (typeof requestedPriority === "string" && requestedPriority.trim()) {
+    const trimmed = requestedPriority.trim();
+    normalizedReqPriority = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  }
+
+  // IT Priority filter: support "UNASSIGNED" -> null check
+  let itPriorityCondition: Prisma.TicketWhereInput | undefined;
+  if (typeof itPriority === "string" && itPriority.trim()) {
+    const trimmedIt = itPriority.trim();
+    if (trimmedIt.toUpperCase() === "UNASSIGNED") {
+      itPriorityCondition = { itPriority: null };
+    } else {
+      const normalizedIt = trimmedIt.charAt(0).toUpperCase() + trimmedIt.slice(1).toLowerCase();
+      itPriorityCondition = { itPriority: normalizedIt };
+    }
+  }
+
+  // Status filter
+  let statusFilter: string | undefined;
+  if (typeof status === "string" && status.trim()) {
+    statusFilter = status.trim();
+  }
+
+  // Search keyword (ticketNumber, summary, description)
+  const searchKeyword = typeof search === "string" ? search.trim() : "";
+
+  // Sort validation
+  const sortBy = typeof rawSortBy === "string" && rawSortBy.trim() ? rawSortBy.trim() : "createdAt";
+  if (!VALID_SORT_FIELDS.has(sortBy)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_QUERY_PARAMETER",
+        message: "Invalid query parameters supplied.",
+        details: [
+          {
+            field: "sortBy",
+            message: `Invalid sortBy field '${sortBy}'. Allowed fields: ticketNumber, createdAt, updatedAt, currentStatus.`,
+          },
+        ],
+      },
+    });
+  }
+
+  const sortOrder = String(rawSortOrder).toLowerCase() === "asc" ? "asc" : "desc";
+
+  // Pagination parameters
+  const pageParsed = parseInt(String(rawPage), 10);
+  const page = isNaN(pageParsed) || pageParsed < 1 ? 1 : pageParsed;
+
+  const pageSizeParsed = parseInt(String(rawPageSize), 10);
+  const pageSize = isNaN(pageSizeParsed) || pageSizeParsed < 1 ? 10 : pageSizeParsed;
+  const offset = (page - 1) * pageSize;
+
+  // 3. Build strictly isolated Prisma query
+  const where: Prisma.TicketWhereInput = {
+    requesterId: requester.id, // INVARIANT: Strict requester isolation (BR-08)
+    ...(parsedCategoryId !== undefined ? { categoryId: parsedCategoryId } : {}),
+    ...(normalizedReqPriority ? { requestedPriority: normalizedReqPriority } : {}),
+    ...(itPriorityCondition ? itPriorityCondition : {}),
+    ...(statusFilter ? { currentStatus: statusFilter } : {}),
+    ...(searchKeyword
+      ? {
+          OR: [
+            { ticketNumber: { contains: searchKeyword, mode: "insensitive" } },
+            { summary: { contains: searchKeyword, mode: "insensitive" } },
+            { description: { contains: searchKeyword, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  try {
+    const totalCount = await prisma.ticket.count({ where });
+    // totalPages returns 0 when totalCount is 0 so client triggers disable correctly
+    const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / pageSize);
+
+    const tickets = await prisma.ticket.findMany({
+      where,
+      orderBy: {
+        [sortBy]: sortOrder,
+      },
+      skip: offset,
+      take: pageSize,
+      include: {
+        category: true,
+        relatedSystem: true,
+      },
+    });
+
+    const formattedTickets = tickets.map((t) => ({
+      id: t.id,
+      ticketNumber: t.ticketNumber,
+      summary: t.summary,
+      description: t.description,
+      categoryId: t.categoryId,
+      categoryName: t.category.name,
+      relatedSystemId: t.relatedSystemId,
+      relatedSystemName: t.relatedSystem.name,
+      requestedPriority: t.requestedPriority,
+      itPriority: t.itPriority,
+      currentStatus: t.currentStatus,
+      requesterId: t.requesterId,
+      ticketOwner: null,
+      createdAt: t.createdAt.toISOString(),
+      updatedAt: t.updatedAt.toISOString(),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: formattedTickets,
+      pagination: {
+        totalCount,
+        totalItems: totalCount,
+        totalPages,
+        currentPage: page,
+        pageSize,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error retrieving tickets:", error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to retrieve tickets due to an unexpected server error.",
+        details: [],
+      },
+    });
+  }
+}
+
+// Register routes
+ticketsRouter.get("/", handleGetTickets);
 ticketsRouter.post("/", uploadAttachments, handleCreateTicket);
