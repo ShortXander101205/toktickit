@@ -117,3 +117,65 @@ export async function checkSystem(): Promise<SystemStatus> {
   const categories: Category[] = Array.isArray(json) ? json : json.data;
   return { online: true, categories };
 }
+
+export interface FetchTicketsParams {
+  search?: string;
+  category?: number | string;
+  categoryId?: number | string;
+  requestedPriority?: string;
+  itPriority?: string;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedTicketsResponse {
+  success: boolean;
+  data: Ticket[];
+  pagination: {
+    totalCount: number;
+    totalItems: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
+}
+
+// Fetch owned tickets for active requester with search, filters, sorting, and pagination
+export async function fetchTickets(
+  params: FetchTicketsParams = {},
+  activeRequesterId: number
+): Promise<PaginatedTicketsResponse> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  const catVal = params.category ?? params.categoryId;
+  if (catVal !== undefined && catVal !== "") query.set("category", String(catVal));
+  if (params.requestedPriority) query.set("requestedPriority", params.requestedPriority);
+  if (params.itPriority) query.set("itPriority", params.itPriority);
+  if (params.status) query.set("status", params.status);
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+  if (params.sortOrder) query.set("sortOrder", params.sortOrder);
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
+
+  const queryString = query.toString() ? `?${query.toString()}` : "";
+  const res = await fetch(`${API_URL}/api/tickets${queryString}`, {
+    headers: {
+      "x-requester-id": String(activeRequesterId),
+    },
+  });
+
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => null);
+    const msg = errorJson?.error?.message || `Failed to fetch tickets: HTTP ${res.status}`;
+    const err: any = new Error(msg);
+    err.status = res.status;
+    err.response = errorJson;
+    throw err;
+  }
+
+  const json: PaginatedTicketsResponse = await res.json();
+  return json;
+}
