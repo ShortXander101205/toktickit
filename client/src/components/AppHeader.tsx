@@ -11,7 +11,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
   return (
     <header
-      className="d-flex align-items-center justify-content-between px-4"
+      className="d-flex align-items-center justify-content-between px-3 px-md-4"
       style={{
         backgroundColor: "var(--color-primary-green)",
         height: "56px",
@@ -19,7 +19,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
       }}
     >
       {/* Brand */}
-      <div className="d-flex align-items-center gap-2">
+      <div className="d-flex align-items-center gap-2 flex-shrink-0">
         <svg
           width="24"
           height="24"
@@ -34,7 +34,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
         </svg>
         <span className="fw-bold fs-5 tracking-tight">TokTickIT</span>
         <span
-          className="badge ms-1"
+          className="badge ms-1 d-none d-sm-inline-block"
           style={{
             backgroundColor: "rgba(255, 255, 255, 0.2)",
             color: "#ffffff",
@@ -75,13 +75,14 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
       </nav>
 
       {/* Right Persona Badge */}
-      <div className="d-flex align-items-center">
+      <div className="d-flex align-items-center ms-2">
         {currentRequester ? (
           <div
-            className="d-flex align-items-center px-3 py-1 rounded-pill"
+            className="d-flex align-items-center px-2 px-sm-3 py-1 rounded-pill"
             style={{
               backgroundColor: "rgba(255, 255, 255, 0.15)",
               border: "1px solid rgba(255, 255, 255, 0.25)",
+              maxWidth: "100%",
             }}
           >
             <svg
@@ -93,17 +94,22 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="me-2"
+              className="me-1 me-sm-2 flex-shrink-0"
             >
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
-            <span className="small fw-semibold me-2" data-testid="active-user-name">
+            <span
+              className="small fw-semibold me-2 text-truncate"
+              style={{ maxWidth: "110px" }}
+              data-testid="active-user-name"
+              title={currentRequester.name}
+            >
               {currentRequester.name}
             </span>
             <button
               type="button"
-              className="btn btn-sm btn-outline-light py-0 px-2"
+              className="btn btn-sm btn-outline-light py-0 px-2 flex-shrink-0"
               style={{ fontSize: "0.75rem", borderRadius: "12px" }}
               onClick={openSwitchModal}
             >
