@@ -11,8 +11,8 @@ interface AttachmentSectionProps {
   onAttachmentRemoved: (attachmentId: number, removedData: any) => void;
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
+function formatBytes(bytes?: number | null): string {
+  if (bytes === undefined || bytes === null || isNaN(bytes) || bytes <= 0) return "0 Bytes";
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -143,11 +143,12 @@ export function AttachmentSection({
 
     try {
       const res = await removeAttachment(targetForRemoval.id, trimmedReason, currentRequester.id);
-      onAttachmentRemoved(targetForRemoval.id, res.data || {
-        id: targetForRemoval.id,
+      onAttachmentRemoved(targetForRemoval.id, {
+        ...targetForRemoval,
+        ...(res.data || {}),
         isRemoved: true,
         removalReason: trimmedReason,
-        removedAt: new Date().toISOString(),
+        removedAt: res.data?.removedAt || new Date().toISOString(),
         removedByRequesterId: currentRequester.id,
         removedByRequesterName: currentRequester.name,
       });
@@ -233,13 +234,13 @@ export function AttachmentSection({
         </div>
       ) : (
         <div className="table-responsive mb-4">
-          <table className="table table-hover align-middle mb-0 small">
+          <table className="table table-hover align-middle mb-0 small" style={{ minWidth: "540px" }}>
             <thead className="table-light">
               <tr>
-                <th scope="col">File Name</th>
-                <th scope="col" style={{ width: "120px" }}>Size</th>
-                <th scope="col" style={{ width: "160px" }}>Uploaded Date</th>
-                <th scope="col" className="text-end" style={{ width: "180px" }}>Actions</th>
+                <th scope="col" style={{ minWidth: "180px" }}>File Name</th>
+                <th scope="col" style={{ width: "100px", minWidth: "90px" }}>Size</th>
+                <th scope="col" style={{ width: "150px", minWidth: "130px" }}>Uploaded Date</th>
+                <th scope="col" className="text-end" style={{ width: "170px", minWidth: "160px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -250,12 +251,12 @@ export function AttachmentSection({
                       <span className="text-secondary">
                         {att.mimeType === "application/pdf" ? "📄" : "🖼"}
                       </span>
-                      <span className="fw-medium text-break">{att.originalFilename}</span>
+                      <span className="fw-medium text-nowrap">{att.originalFilename}</span>
                     </div>
                   </td>
-                  <td className="text-muted">{formatBytes(att.fileSize)}</td>
-                  <td className="text-muted">{formatDate(att.createdAt)}</td>
-                  <td className="text-end">
+                  <td className="text-muted text-nowrap">{formatBytes(att.fileSize)}</td>
+                  <td className="text-muted text-nowrap">{formatDate(att.createdAt)}</td>
+                  <td className="text-end text-nowrap">
                     <div className="btn-group btn-group-sm">
                       <button
                         type="button"

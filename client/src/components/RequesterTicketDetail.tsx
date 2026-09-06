@@ -19,83 +19,138 @@ function formatDate(dateStr?: string | null): string {
   }
 }
 
-// Zen Green status badge helper
+// Zen Green status badge helper (paired color, text label, and SVG micro-icon - DEC-UI-19)
 function renderStatusBadge(status: string) {
   const s = status.toLowerCase();
-  let bg = "#EBF5FF";
-  let color = "#1E429F";
-  let icon = "🕒";
 
   if (s.includes("progress") || s.includes("assigned")) {
-    bg = "#FEF08A";
-    color = "#854D0E";
-    icon = "⚙️";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2.5 py-1.5"
+        style={{ backgroundColor: "#FEF08A", color: "#854D0E", fontSize: "0.8125rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>{status}</span>
+      </span>
+    );
   } else if (s.includes("pending")) {
-    bg = "#FFEDD5";
-    color = "#9A3412";
-    icon = "❓";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2.5 py-1.5"
+        style={{ backgroundColor: "#FFEDD5", color: "#9A3412", fontSize: "0.8125rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>{status}</span>
+      </span>
+    );
   } else if (s.includes("resolved") || s.includes("closed")) {
-    bg = "#EAF6EF";
-    color = "#006B3C";
-    icon = "✓";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2.5 py-1.5"
+        style={{ backgroundColor: "#EAF6EF", color: "#006B3C", fontSize: "0.8125rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <span>{status}</span>
+      </span>
+    );
   } else if (s.includes("cancelled")) {
-    bg = "#F3F4F6";
-    color = "#4B5563";
-    icon = "✕";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2.5 py-1.5"
+        style={{ backgroundColor: "#F3F4F6", color: "#4B5563", fontSize: "0.8125rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+        <span>{status}</span>
+      </span>
+    );
   }
 
+  // Default: New
   return (
     <span
-      className="badge d-inline-flex align-items-center gap-1 px-2.5 py-1.5"
-      style={{
-        backgroundColor: bg,
-        color,
-        borderRadius: "12px",
-        fontSize: "0.8125rem",
-        fontWeight: 600,
-      }}
+      className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2.5 py-1.5"
+      style={{ backgroundColor: "#EBF5FF", color: "#1E429F", fontSize: "0.8125rem", fontWeight: 600 }}
     >
-      <span aria-hidden="true">{icon}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
       <span>{status}</span>
     </span>
   );
 }
 
-// Zen Green priority badge helper
+// Zen Green priority badge helper (paired color, text label, and SVG micro-icon - DEC-UI-19)
 function renderPriorityBadge(priority?: string | null) {
   if (!priority) return <span className="text-muted small">Unassigned</span>;
 
   const p = priority.toLowerCase();
-  let bg = "#F3F4F6";
-  let color = "#374151";
-  let icon = "↓";
 
   if (p === "medium") {
-    bg = "#FEF3C7";
-    color = "#92400E";
-    icon = "–";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2 py-1"
+        style={{ backgroundColor: "#FEF3C7", color: "#92400E", fontSize: "0.75rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>{priority}</span>
+      </span>
+    );
   } else if (p === "high") {
-    bg = "#FFEDD5";
-    color = "#C2410C";
-    icon = "↑";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2 py-1"
+        style={{ backgroundColor: "#FFEDD5", color: "#C2410C", fontSize: "0.75rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+        <span>{priority}</span>
+      </span>
+    );
   } else if (p === "urgent") {
-    bg = "#FEE2E2";
-    color = "#991B1B";
-    icon = "▲";
+    return (
+      <span
+        className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2 py-1"
+        style={{ backgroundColor: "#FEE2E2", color: "#991B1B", fontSize: "0.75rem", fontWeight: 600 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <span>{priority}</span>
+      </span>
+    );
   }
 
+  // Default: Low
   return (
     <span
-      className="badge d-inline-flex align-items-center gap-1 px-2 py-1"
-      style={{
-        backgroundColor: bg,
-        color,
-        borderRadius: "12px",
-        fontSize: "0.75rem",
-        fontWeight: 600,
-      }}
+      className="badge rounded-pill d-inline-flex align-items-center gap-1 px-2 py-1"
+      style={{ backgroundColor: "#F3F4F6", color: "#374151", fontSize: "0.75rem", fontWeight: 600 }}
     >
-      <span aria-hidden="true">{icon}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <polyline points="19 12 12 19 5 12"></polyline>
+      </svg>
       <span>{priority}</span>
     </span>
   );

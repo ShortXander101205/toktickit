@@ -16,3 +16,10 @@ server/prisma/*.db
 # uploads & attachments
 server/uploads/
 uploads/
+
+# test artifacts & reports
+test-results/
+playwright-report/
+
+# Ignore E2E test screenshots / artifacts
+artifacts/lab-02/screenshots/

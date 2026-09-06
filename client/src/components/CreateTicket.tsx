@@ -200,6 +200,66 @@ export function CreateTicket({ onSuccess, onCancel }: CreateTicketProps) {
     setCreatedTicket(null);
   }
 
+  // Zen Green priority badge helper
+  function renderPriorityBadge(priority: string) {
+    switch (priority) {
+      case "Low":
+        return (
+          <span
+            className="badge rounded-pill d-inline-flex align-items-center gap-1"
+            style={{ backgroundColor: "#F3F4F6", color: "#374151", padding: "0.25rem 0.65rem", fontSize: "0.75rem", fontWeight: 600 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <polyline points="19 12 12 19 5 12"></polyline>
+            </svg>
+            Low
+          </span>
+        );
+      case "Medium":
+        return (
+          <span
+            className="badge rounded-pill d-inline-flex align-items-center gap-1"
+            style={{ backgroundColor: "#FEF3C7", color: "#92400E", padding: "0.25rem 0.65rem", fontSize: "0.75rem", fontWeight: 600 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Medium
+          </span>
+        );
+      case "High":
+        return (
+          <span
+            className="badge rounded-pill d-inline-flex align-items-center gap-1"
+            style={{ backgroundColor: "#FFEDD5", color: "#C2410C", padding: "0.25rem 0.65rem", fontSize: "0.75rem", fontWeight: 600 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="19" x2="12" y2="5"></line>
+              <polyline points="5 12 12 5 19 12"></polyline>
+            </svg>
+            High
+          </span>
+        );
+      case "Urgent":
+        return (
+          <span
+            className="badge rounded-pill d-inline-flex align-items-center gap-1"
+            style={{ backgroundColor: "#FEE2E2", color: "#991B1B", padding: "0.25rem 0.65rem", fontSize: "0.75rem", fontWeight: 600 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            Urgent
+          </span>
+        );
+      default:
+        return <span className="badge bg-secondary">{priority}</span>;
+    }
+  }
+
   // Render Success View
   if (createdTicket) {
     return (
@@ -260,7 +320,7 @@ export function CreateTicket({ onSuccess, onCancel }: CreateTicketProps) {
               <div className="col-8">{createdTicket.categoryName || categoryId}</div>
               <div className="col-4 text-muted">Priority:</div>
               <div className="col-8">
-                <span className="badge bg-secondary">{createdTicket.requestedPriority}</span>
+                {renderPriorityBadge(createdTicket.requestedPriority)}
               </div>
               <div className="col-4 text-muted">Attachments:</div>
               <div className="col-8">{createdTicket.attachments?.length || 0} file(s)</div>
