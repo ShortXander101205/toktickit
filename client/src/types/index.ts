@@ -33,6 +33,11 @@ export interface Attachment {
   storedFilename?: string;
   mimeType: string;
   fileSize: number;
+  isRemoved?: boolean;
+  removalReason?: string | null;
+  removedAt?: string | null;
+  removedByRequesterId?: number | null;
+  removedByRequesterName?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -54,6 +59,14 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
   attachments?: Attachment[];
+}
+
+export interface TicketDetail extends Ticket {
+  requesterEmail?: string;
+  ticketOwner?: string | null;
+  resolutionSummary?: string | null;
+  attachments: Attachment[];
+  removedAttachments: Attachment[];
 }
 
 export interface CreateTicketPayload {

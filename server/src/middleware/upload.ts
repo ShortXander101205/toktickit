@@ -105,3 +105,62 @@ export const uploadAttachments = (req: Request, res: Response, next: NextFunctio
     next();
   });
 };
+
+export const uploadSingleAttachment = (req: Request, res: Response, next: NextFunction) => {
+  upload.any()(req, res, (err: any) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(422).json({
+            success: false,
+            error: {
+              code: "FILE_TOO_LARGE",
+              message: "File exceeds the maximum allowed size of 5 MB (5,242,880 bytes).",
+              details: [
+                {
+                  field: "file",
+                  message: "Maximum size per file is 5 MB.",
+                },
+              ],
+            },
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "UPLOAD_ERROR",
+            message: err.message,
+            details: [],
+          },
+        });
+      }
+
+      if (err.code === "UNSUPPORTED_MEDIA_TYPE") {
+        return res.status(415).json({
+          success: false,
+          error: {
+            code: "UNSUPPORTED_MEDIA_TYPE",
+            message: err.message,
+            details: [
+              {
+                field: "file",
+                message: "Invalid file type. Only JPG, PNG, WEBP, and PDF are accepted.",
+              },
+            ],
+          },
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "UPLOAD_ERROR",
+          message: err.message || "Failed to process uploaded file.",
+          details: [],
+        },
+      });
+    }
+
+    next();
+  });
+};

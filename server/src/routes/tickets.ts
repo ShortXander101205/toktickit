@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "../prisma.js";
-import { uploadAttachments } from "../middleware/upload.js";
+import { uploadAttachments, uploadSingleAttachment } from "../middleware/upload.js";
 import { generateTicketNumber } from "../services/ticketNumber.service.js";
 import { saveAttachmentFile } from "../services/attachmentStorage.service.js";
 import { validateAttachmentFile, validateAttachmentQuantity } from "../services/attachmentValidator.js";
@@ -459,6 +459,345 @@ export async function handleGetTickets(req: Request, res: Response) {
   }
 }
 
+export async function handleGetTicketDetail(req: Request, res: Response) {
+  const prisma = getPrisma();
+
+  // 1. Verify and extract requester ID from header
+  const rawRequesterId = req.headers["x-requester-id"];
+  if (!rawRequesterId) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "MISSING_REQUESTER_HEADER",
+        message: "The 'x-requester-id' header is required to identify the submitting requester.",
+        details: [],
+      },
+    });
+  }
+
+  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+  if (isNaN(requesterId)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_REQUESTER_HEADER",
+        message: "The 'x-requester-id' header must be a valid integer ID.",
+        details: [],
+      },
+    });
+  }
+
+  const requester = await prisma.requesterUser.findUnique({
+    where: { id: requesterId },
+  });
+
+  if (!requester || !requester.isActive) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: "REQUESTER_NOT_FOUND",
+        message: "Requester not found or is inactive.",
+        details: [],
+      },
+    });
+  }
+
+  // 2. Parse and validate ticket ID parameter
+  const ticketId = parseInt(req.params.id, 10);
+  if (isNaN(ticketId)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_TICKET_ID",
+        message: "Ticket ID must be a valid integer.",
+        details: [],
+      },
+    });
+  }
+
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        category: true,
+        relatedSystem: true,
+        requester: true,
+        attachments: {
+          include: { removedByRequester: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "TICKET_NOT_FOUND",
+          message: "Ticket not found with the specified ID.",
+          details: [],
+        },
+      });
+    }
+
+    // Strict Cross-Requester Ownership Check (BR-08, AC-12)
+    if (ticket.requesterId !== requester.id) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN_TICKET_ACCESS",
+          message: "Access denied. You do not have permission to view this ticket.",
+          details: [],
+        },
+      });
+    }
+
+    const activeAttachments = ticket.attachments
+      .filter((a) => !a.isRemoved)
+      .map((a) => ({
+        id: a.id,
+        ticketId: a.ticketId,
+        originalFilename: a.originalFilename,
+        mimeType: a.mimeType,
+        fileSize: a.fileSize,
+        isRemoved: false,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      }));
+
+    const removedAttachments = ticket.attachments
+      .filter((a) => a.isRemoved)
+      .map((a) => ({
+        id: a.id,
+        ticketId: a.ticketId,
+        originalFilename: a.originalFilename,
+        mimeType: a.mimeType,
+        fileSize: a.fileSize,
+        isRemoved: true,
+        removalReason: a.removalReason,
+        removedAt: a.removedAt ? a.removedAt.toISOString() : null,
+        removedByRequesterId: a.removedByRequesterId,
+        removedByRequesterName: a.removedByRequester?.name || null,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        summary: ticket.summary,
+        description: ticket.description,
+        categoryId: ticket.categoryId,
+        categoryName: ticket.category.name,
+        relatedSystemId: ticket.relatedSystemId,
+        relatedSystemName: ticket.relatedSystem.name,
+        requestedPriority: ticket.requestedPriority,
+        itPriority: ticket.itPriority,
+        currentStatus: ticket.currentStatus,
+        ticketOwner: null,
+        requesterId: ticket.requesterId,
+        requesterName: ticket.requester.name,
+        requesterEmail: ticket.requester.email,
+        createdAt: ticket.createdAt.toISOString(),
+        updatedAt: ticket.updatedAt.toISOString(),
+        attachments: activeAttachments,
+        removedAttachments,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error retrieving ticket detail:", error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to retrieve ticket detail due to an unexpected server error.",
+        details: [],
+      },
+    });
+  }
+}
+
+export async function handleUploadTicketAttachment(req: Request, res: Response) {
+  const prisma = getPrisma();
+
+  // 1. Verify and extract requester ID from header
+  const rawRequesterId = req.headers["x-requester-id"];
+  if (!rawRequesterId) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "MISSING_REQUESTER_HEADER",
+        message: "The 'x-requester-id' header is required to identify the submitting requester.",
+        details: [],
+      },
+    });
+  }
+
+  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+  if (isNaN(requesterId)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_REQUESTER_HEADER",
+        message: "The 'x-requester-id' header must be a valid integer ID.",
+        details: [],
+      },
+    });
+  }
+
+  const requester = await prisma.requesterUser.findUnique({
+    where: { id: requesterId },
+  });
+
+  if (!requester || !requester.isActive) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: "REQUESTER_NOT_FOUND",
+        message: "Requester not found or is inactive.",
+        details: [],
+      },
+    });
+  }
+
+  // 2. Parse ticket ID
+  const ticketId = parseInt(req.params.id, 10);
+  if (isNaN(ticketId)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_TICKET_ID",
+        message: "Ticket ID must be a valid integer.",
+        details: [],
+      },
+    });
+  }
+
+  // 3. Find ticket and verify ownership (BR-08)
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+  });
+
+  if (!ticket) {
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: "TICKET_NOT_FOUND",
+        message: "Ticket not found with the specified ID.",
+        details: [],
+      },
+    });
+  }
+
+  if (ticket.requesterId !== requester.id) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: "FORBIDDEN_TICKET_ACCESS",
+        message: "Access denied. You do not have permission to upload attachments to this ticket.",
+        details: [],
+      },
+    });
+  }
+
+  // 4. Check file presence
+  const file = (req.files && Array.isArray(req.files) && req.files.length > 0) ? req.files[0] : req.file;
+  if (!file) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "MISSING_ATTACHMENT_FILE",
+        message: "Attachment file is required.",
+        details: [],
+      },
+    });
+  }
+
+  // 5. Check active attachment quantity limit (BR-06, AC-15)
+  // ONLY count active attachments (isRemoved === false)
+  const activeCount = await prisma.attachment.count({
+    where: {
+      ticketId,
+      isRemoved: false,
+    },
+  });
+
+  const quantityCheck = validateAttachmentQuantity(activeCount, 1);
+  if (!quantityCheck.valid) {
+    return res.status(422).json({
+      success: false,
+      error: {
+        code: "ATTACHMENT_LIMIT_EXCEEDED",
+        message: quantityCheck.error || "Total active attachments cannot exceed 5 files.",
+        details: [
+          {
+            field: "file",
+            message: `Current active attachments: ${activeCount}. Maximum allowed is 5.`,
+          },
+        ],
+      },
+    });
+  }
+
+  // 6. Validate file size and MIME type (BR-06, AC-14)
+  const fileCheck = validateAttachmentFile(file.originalname, file.mimetype, file.size);
+  if (!fileCheck.valid) {
+    return res.status(422).json({
+      success: false,
+      error: {
+        code: "INVALID_ATTACHMENT",
+        message: fileCheck.error || "Attachment validation failed.",
+        details: [{ field: "file", message: fileCheck.error || "Invalid file" }],
+      },
+    });
+  }
+
+  try {
+    // 7. Save file binary to storage
+    const { storedFilename } = await saveAttachmentFile(file.originalname, file.buffer);
+
+    // 8. Persist attachment record
+    const attachment = await prisma.attachment.create({
+      data: {
+        ticketId,
+        originalFilename: file.originalname,
+        storedFilename,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        isRemoved: false,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Attachment uploaded successfully",
+      data: {
+        id: attachment.id,
+        ticketId: attachment.ticketId,
+        originalFilename: attachment.originalFilename,
+        mimeType: attachment.mimeType,
+        fileSize: attachment.fileSize,
+        isRemoved: false,
+        createdAt: attachment.createdAt.toISOString(),
+      },
+    });
+  } catch (error: any) {
+    console.error("Error uploading ticket attachment:", error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to upload attachment due to an unexpected server error.",
+        details: [],
+      },
+    });
+  }
+}
+
 // Register routes
 ticketsRouter.get("/", handleGetTickets);
 ticketsRouter.post("/", uploadAttachments, handleCreateTicket);
+ticketsRouter.get("/:id", handleGetTicketDetail);
+ticketsRouter.post("/:id/attachments", uploadSingleAttachment, handleUploadTicketAttachment);

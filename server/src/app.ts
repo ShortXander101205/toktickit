@@ -3,6 +3,7 @@ import cors from "cors";
 import { requestersRouter, getActiveRequesters } from "./routes/requesters.js";
 import { referenceRouter, getCategories, getRelatedSystems } from "./routes/reference.js";
 import { ticketsRouter } from "./routes/tickets.js";
+import { attachmentsRouter } from "./routes/attachments.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -31,6 +32,7 @@ app.use("/api", referenceRouter);
 // Lab 2 — Feature 3 (Feature 7) Ticket Creation Routes
 // ---------------------------------------------------------------------------
 app.use("/api/tickets", ticketsRouter);
+app.use("/api/attachments", attachmentsRouter);
 
 // Aliases for /api/v1 prefix
 app.use("/api/v1/requesters", requestersRouter);
@@ -38,5 +40,6 @@ app.get("/api/v1/development-requesters", getActiveRequesters);
 app.get("/api/v1/related-systems", getRelatedSystems);
 app.get("/api/v1/categories", getCategories);
 app.use("/api/v1/tickets", ticketsRouter);
+app.use("/api/v1/attachments", attachmentsRouter);
 
 export default app;

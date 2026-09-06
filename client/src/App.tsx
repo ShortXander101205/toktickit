@@ -6,16 +6,24 @@ import { checkSystem, Category } from "./api.js";
 
 import { CreateTicket } from "./components/CreateTicket.js";
 import { MyTickets } from "./components/MyTickets.js";
+import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
 
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
   const { currentRequester, isSwitchModalOpen, closeSwitchModal } = useRequester();
   const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket">("my-tickets");
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
 
   // System status checker (preserved from Lab 1)
   const [sysState, setSysState] = useState<SystemCheckState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
+
+  // Reset selected ticket detail when requester switches
+  function handleTabChange(tab: "my-tickets" | "create-ticket") {
+    setSelectedTicketId(null);
+    setActiveTab(tab);
+  }
 
   async function handleCheck() {
     setSysState("loading");
@@ -31,7 +39,7 @@ function MainApp() {
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: "var(--color-page-bg)" }}>
       {/* App Shell Header */}
-      <AppHeader currentTab={activeTab} onTabChange={setActiveTab} />
+      <AppHeader currentTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Mode A: Blocking Requester Selector (if no persona selected) */}
       {!currentRequester && <RequesterSelector isSwitchMode={false} />}
@@ -45,14 +53,29 @@ function MainApp() {
       <main className="container-xl py-4 flex-grow-1" style={{ maxWidth: "1200px" }}>
         {currentRequester ? (
           <div>
-            {activeTab === "create-ticket" ? (
+            {selectedTicketId !== null ? (
+              <RequesterTicketDetail
+                ticketId={selectedTicketId}
+                onBack={() => setSelectedTicketId(null)}
+              />
+            ) : activeTab === "create-ticket" ? (
               <CreateTicket
-                onSuccess={() => setActiveTab("my-tickets")}
-                onCancel={() => setActiveTab("my-tickets")}
+                onSuccess={() => {
+                  setSelectedTicketId(null);
+                  setActiveTab("my-tickets");
+                }}
+                onCancel={() => {
+                  setSelectedTicketId(null);
+                  setActiveTab("my-tickets");
+                }}
               />
             ) : (
               <MyTickets
-                onCreateTicket={() => setActiveTab("create-ticket")}
+                onCreateTicket={() => {
+                  setSelectedTicketId(null);
+                  setActiveTab("create-ticket");
+                }}
+                onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}
               />
             )}
           </div>

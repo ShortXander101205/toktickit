@@ -1,4 +1,4 @@
-import { RequesterUser, RelatedSystem, Category, ApiResponse, Ticket, CreateTicketPayload } from "./types/index.js";
+import { RequesterUser, RelatedSystem, Category, ApiResponse, Ticket, TicketDetail, Attachment, CreateTicketPayload } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -177,5 +177,137 @@ export async function fetchTickets(
   }
 
   const json: PaginatedTicketsResponse = await res.json();
+  return json;
+}
+
+// Fetch complete ticket detail for active requester
+export async function fetchTicketDetail(
+  ticketId: number,
+  activeRequesterId: number
+): Promise<TicketDetail> {
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
+    headers: {
+      "x-requester-id": String(activeRequesterId),
+    },
+  });
+
+  const json: ApiResponse<TicketDetail> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch ticket: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+// Upload attachment file directly to ticket
+export async function uploadTicketAttachment(
+  ticketId: number,
+  file: File,
+  activeRequesterId: number
+): Promise<Attachment> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    headers: {
+      "x-requester-id": String(activeRequesterId),
+    },
+    body: formData,
+  });
+
+  const json: ApiResponse<Attachment> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to upload attachment: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+// Download active attachment file
+export async function downloadAttachment(
+  attachmentId: number,
+  filename: string,
+  activeRequesterId: number
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/attachments/${attachmentId}/download`, {
+    headers: {
+      "x-requester-id": String(activeRequesterId),
+    },
+  });
+
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => null);
+    const msg = errorJson?.error?.message || `Download failed: HTTP ${res.status}`;
+    const err: any = new Error(msg);
+    err.status = res.status;
+    err.response = errorJson;
+    throw err;
+  }
+
+  const blob = await res.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = downloadUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(downloadUrl);
+}
+
+// Soft-remove attachment with reason
+export async function removeAttachment(
+  attachmentId: number,
+  reason: string,
+  activeRequesterId: number
+): Promise<ApiResponse<any>> {
+  const res = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "x-requester-id": String(activeRequesterId),
+    },
+    body: JSON.stringify({ reason }),
+  });
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to remove attachment: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
   return json;
 }
