@@ -1,5 +1,4 @@
-// Prisma schema — datasource and generator are pre-wired.
-// Your DATABASE_URL lives in server/.env (copy it from .env.example).
+// Prisma schema for TokTickIT IT Service Desk
 
 generator client {
   provider = "prisma-client-js"
@@ -11,17 +10,117 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
-// Issue 3 — Create and seed IT request categories
-// Define a Category model with:
-//   id        Int      @id @default(autoincrement())
-//   name      String   @unique
-//   createdAt DateTime @default(now())
-// Then run:  npx prisma migrate dev --name init
+// 1. Requester User (Simulated Development Identity)
 // ---------------------------------------------------------------------------
+model RequesterUser {
+  id                 Int          @id @default(autoincrement())
+  name               String
+  email              String       @unique
+  department         String?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-model Category {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  // Relational Integrity
+  tickets            Ticket[]     @relation("RequesterTickets")
+  removedAttachments Attachment[] @relation("RequesterRemovedAttachments")
+
+  @@map("requester_users")
 }
 
+// ---------------------------------------------------------------------------
+// 2. Related System (Affected Campus IT Services)
+// ---------------------------------------------------------------------------
+model RelatedSystem {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relational Integrity
+  tickets   Ticket[]
+
+  @@map("related_systems")
+}
+
+// ---------------------------------------------------------------------------
+// 3. Category (Problem Classification — Extended from Lab 1)
+// ---------------------------------------------------------------------------
+model Category {
+  id          Int      @id @default(autoincrement())
+  code        String?  @unique
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relational Integrity
+  tickets     Ticket[]
+
+  @@map("categories")
+}
+
+// ---------------------------------------------------------------------------
+// 4. Ticket (Service Desk Incident / Request)
+// ---------------------------------------------------------------------------
+model Ticket {
+  id                Int           @id @default(autoincrement())
+  ticketNumber      String        @unique @db.VarChar(32) // Format: TKT-YYYY-NNNNN
+  requesterId       Int
+  categoryId        Int
+  relatedSystemId   Int
+  summary           String        @db.VarChar(100)
+  description       String        @db.Text
+  requestedPriority String        // Low, Medium, High, Urgent
+  itPriority        String?       // Low, Medium, High, Urgent
+  currentStatus     String        @default("New") // New, Assigned, In Progress, Pending Requester, Resolved, Closed, Cancelled
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  requester         RequesterUser @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  attachments       Attachment[]
+
+  @@index([requesterId])
+  @@index([currentStatus])
+  @@map("tickets")
+}
+
+// ---------------------------------------------------------------------------
+// 5. Attachment (Supporting File Metadata & Soft-Removal Tombstone)
+// ---------------------------------------------------------------------------
+model Attachment {
+  id                   Int            @id @default(autoincrement())
+  ticketId             Int
+  originalFilename     String
+  storedFilename       String         @unique
+  mimeType             String
+  fileSize             Int            // Size in bytes
+  isRemoved            Boolean        @default(false)
+  removalReason        String?        @db.Text
+  removedAt            DateTime?
+  removedByRequesterId Int?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  // Relations
+  ticket               Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  removedByRequester   RequesterUser? @relation("RequesterRemovedAttachments", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@map("attachments")
+}
+
+// ---------------------------------------------------------------------------
+// 6. Ticket Number Sequence (Annual Sequence Reset for TKT-YYYY-NNNNN)
+// ---------------------------------------------------------------------------
+model TicketNumberSequence {
+  year    Int @id
+  nextVal Int @default(1)
+
+  @@map("ticket_number_sequences")
+}
