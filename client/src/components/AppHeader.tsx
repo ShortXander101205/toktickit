@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { useRequester } from "../context/RequesterContext.js";
+import React, { useState, useContext } from "react";
+import { RequesterContext } from "../context/RequesterContext.js";
+import { AuthContext } from "../context/AuthContext.js";
 
 interface AppHeaderProps {
   currentTab?: "my-tickets" | "create-ticket";
@@ -7,8 +8,65 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderProps) {
-  const { currentRequester, openSwitchModal } = useRequester();
+  const auth = useContext(AuthContext);
+  const requesterCtx = useContext(RequesterContext);
+  const currentRequester = requesterCtx?.currentRequester;
+  const openSwitchModal = requesterCtx?.openSwitchModal;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const activeUser = auth?.user;
+
+  function renderRoleBadge(role: string) {
+    if (role === "IT_STAFF") {
+      return (
+        <span
+          className="badge rounded-pill ms-2"
+          data-testid="user-role-badge"
+          style={{
+            backgroundColor: "#e0f2fe",
+            color: "#0369a1",
+            border: "1px solid #0284c7",
+            fontWeight: 600,
+            fontSize: "0.75rem",
+          }}
+        >
+          IT Staff
+        </span>
+      );
+    }
+    if (role === "ADMINISTRATOR") {
+      return (
+        <span
+          className="badge rounded-pill ms-2"
+          data-testid="user-role-badge"
+          style={{
+            backgroundColor: "#fef3c7",
+            color: "#b45309",
+            border: "1px solid #d97706",
+            fontWeight: 600,
+            fontSize: "0.75rem",
+          }}
+        >
+          Administrator
+        </span>
+      );
+    }
+    return (
+      <span
+        className="badge rounded-pill ms-2"
+        data-testid="user-role-badge"
+        style={{
+          backgroundColor: "#eaf6ef",
+          color: "#006b3c",
+          border: "1px solid #006b3c",
+          fontWeight: 600,
+          fontSize: "0.75rem",
+        }}
+      >
+        Requester
+      </span>
+    );
+  }
 
   return (
     <div className="w-100" style={{ zIndex: 1030 }}>
@@ -107,9 +165,51 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           </button>
         </nav>
 
-        {/* Right Persona Badge */}
+        {/* Right Persona & Auth Badge */}
         <div className="d-flex align-items-center ms-2">
-          {currentRequester ? (
+          {activeUser ? (
+            <div
+              className="d-flex align-items-center px-2 px-sm-3 py-1 rounded-pill"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                maxWidth: "100%",
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="me-1 me-sm-2 flex-shrink-0"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span
+                className="small fw-semibold me-1 text-truncate"
+                style={{ maxWidth: "120px" }}
+                data-testid="active-user-name"
+                title={activeUser.name}
+              >
+                {activeUser.name}
+              </span>
+              {renderRoleBadge(activeUser.role)}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-light ms-2 py-0 px-2 flex-shrink-0"
+                style={{ fontSize: "0.75rem", borderRadius: "12px", minHeight: "28px" }}
+                data-testid="logout-button"
+                onClick={auth.logout}
+              >
+                Log out
+              </button>
+            </div>
+          ) : currentRequester ? (
             <div
               className="d-flex align-items-center px-2 px-sm-3 py-1 rounded-pill"
               style={{
@@ -150,7 +250,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
               </button>
             </div>
           ) : (
-            <span className="small text-white-50">No requester selected</span>
+            <span className="small text-white-50">Not authenticated</span>
           )}
         </div>
       </header>

@@ -240,7 +240,7 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         isRemoved: true,
         removalReason: "Old file removed",
         removedAt: new Date(),
-        removedByRequesterId: 1,
+        removedByUserId: 1,
       },
     });
 
@@ -376,7 +376,7 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         isRemoved: true,
         removalReason: "File deleted due to privacy concern",
         removedAt: new Date(),
-        removedByRequesterId: 1,
+        removedByUserId: 1,
       },
     });
 

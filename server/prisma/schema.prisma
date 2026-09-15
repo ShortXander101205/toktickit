@@ -10,22 +10,34 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Requester User (Simulated Development Identity)
+// Role Enum (Single Role per User - BR-09)
 // ---------------------------------------------------------------------------
-model RequesterUser {
+enum Role {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
+}
+
+// ---------------------------------------------------------------------------
+// 1. User Model (Unified Production Identity - Issue 12)
+// ---------------------------------------------------------------------------
+model User {
   id                 Int          @id @default(autoincrement())
-  name               String
   email              String       @unique
+  passwordHash       String
+  name               String
   department         String?
+  role               Role         @default(REQUESTER)
+  mustChangePassword Boolean      @default(true)
   isActive           Boolean      @default(true)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  // Relational Integrity
-  tickets            Ticket[]     @relation("RequesterTickets")
-  removedAttachments Attachment[] @relation("RequesterRemovedAttachments")
+  // Relationships
+  requestedTickets   Ticket[]     @relation("RequesterTickets")
+  removedAttachments Attachment[] @relation("UserRemovedAttachments")
 
-  @@map("requester_users")
+  @@map("users")
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +92,7 @@ model Ticket {
   updatedAt         DateTime      @updatedAt
 
   // Relations
-  requester         RequesterUser @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  requester         User          @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
   category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
   attachments       Attachment[]
@@ -94,22 +106,22 @@ model Ticket {
 // 5. Attachment (Supporting File Metadata & Soft-Removal Tombstone)
 // ---------------------------------------------------------------------------
 model Attachment {
-  id                   Int            @id @default(autoincrement())
-  ticketId             Int
-  originalFilename     String
-  storedFilename       String         @unique
-  mimeType             String
-  fileSize             Int            // Size in bytes
-  isRemoved            Boolean        @default(false)
-  removalReason        String?        @db.Text
-  removedAt            DateTime?
-  removedByRequesterId Int?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  id               Int       @id @default(autoincrement())
+  ticketId         Int
+  originalFilename String
+  storedFilename   String    @unique
+  mimeType         String
+  fileSize         Int       // Size in bytes
+  isRemoved        Boolean   @default(false)
+  removalReason    String?   @db.Text
+  removedAt        DateTime?
+  removedByUserId  Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  ticket               Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  removedByRequester   RequesterUser? @relation("RequesterRemovedAttachments", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
+  ticket           Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  removedByUser    User?     @relation("UserRemovedAttachments", fields: [removedByUserId], references: [id], onDelete: SetNull)
 
   @@index([ticketId])
   @@map("attachments")

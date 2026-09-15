@@ -61,7 +61,7 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
         isRemoved: true,
         removalReason: "Uploaded incorrect diagnostic report from previous semester",
         removedAt: new Date("2026-09-03T11:15:00.000Z"),
-        removedByRequesterId: 1,
+        removedByUserId: 1,
       },
     });
 
@@ -167,7 +167,7 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
   });
 
   it("TD-06 (Inactive Requester - 404): returns 404 Not Found when requester is inactive", async () => {
-    const inactiveUser = await prisma.requesterUser.findFirst({ where: { isActive: false } });
+    const inactiveUser = await prisma.user.findFirst({ where: { isActive: false, role: "REQUESTER" } });
     if (inactiveUser) {
       const res = await request(app)
         .get(`/api/tickets/${ticketRequester1.id}`)

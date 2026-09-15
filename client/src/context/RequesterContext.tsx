@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { RequesterUser } from "../types/index.js";
 import { fetchRequesters } from "../api.js";
+import { AuthContext } from "./AuthContext.js";
 
 const STORAGE_KEY = "toktickit_active_requester";
 
@@ -21,7 +22,18 @@ export interface RequesterContextType {
 export const RequesterContext = createContext<RequesterContextType | undefined>(undefined);
 
 export function RequesterProvider({ children }: { children: React.ReactNode }) {
+  const auth = useContext(AuthContext);
+
   const [currentRequester, setCurrentRequester] = useState<RequesterUser | null>(() => {
+    if (auth?.user) {
+      return {
+        id: auth.user.id,
+        name: auth.user.name,
+        email: auth.user.email,
+        department: auth.user.department,
+        isActive: auth.user.isActive,
+      };
+    }
     try {
       const stored = window.sessionStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -32,6 +44,23 @@ export function RequesterProvider({ children }: { children: React.ReactNode }) {
     }
     return null;
   });
+
+  // Keep currentRequester in sync with AuthContext user if AuthProvider is present
+  useEffect(() => {
+    if (auth) {
+      if (auth.user) {
+        setCurrentRequester({
+          id: auth.user.id,
+          name: auth.user.name,
+          email: auth.user.email,
+          department: auth.user.department,
+          isActive: auth.user.isActive,
+        });
+      } else {
+        setCurrentRequester(null);
+      }
+    }
+  }, [auth?.user]);
 
   const [requesters, setRequesters] = useState<RequesterUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);

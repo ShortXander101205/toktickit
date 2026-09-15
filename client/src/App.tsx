@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
 import { AppHeader } from "./components/AppHeader.js";
+import { Login } from "./components/Login.js";
+import { ChangePassword } from "./components/ChangePassword.js";
 import { RequesterSelector } from "./components/RequesterSelector.js";
 import { checkSystem, Category } from "./api.js";
 
@@ -11,6 +14,7 @@ import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
+  const { user } = useAuth();
   const { currentRequester, isSwitchModalOpen, closeSwitchModal } = useRequester();
   const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket">("my-tickets");
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
@@ -19,7 +23,7 @@ function MainApp() {
   const [sysState, setSysState] = useState<SystemCheckState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
 
-  // Reset selected ticket detail when requester switches
+  // Reset selected ticket detail when tab switches
   function handleTabChange(tab: "my-tickets" | "create-ticket") {
     setSelectedTicketId(null);
     setActiveTab(tab);
@@ -36,22 +40,26 @@ function MainApp() {
     }
   }
 
+  const isAuthenticated = Boolean(user);
+  const mustChangePassword = Boolean(user?.mustChangePassword);
+
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: "var(--color-page-bg)" }}>
       {/* App Shell Header */}
       <AppHeader currentTab={activeTab} onTabChange={handleTabChange} />
 
-      {/* Mode A: Blocking Requester Selector (if no persona selected) */}
-      {!currentRequester && <RequesterSelector isSwitchMode={false} />}
-
-      {/* Mode B: Switch Requester Modal (invoked from header) */}
+      {/* Mode B: Switch Requester Modal (invoked from header if present) */}
       {isSwitchModalOpen && (
         <RequesterSelector isSwitchMode={true} onCancel={closeSwitchModal} />
       )}
 
       {/* Main Workspace Container */}
       <main className="container-xl py-4 flex-grow-1" style={{ maxWidth: "1200px" }}>
-        {currentRequester ? (
+        {!isAuthenticated ? (
+          <Login />
+        ) : mustChangePassword ? (
+          <ChangePassword onSuccess={() => setSelectedTicketId(null)} />
+        ) : (
           <div>
             {selectedTicketId !== null ? (
               <RequesterTicketDetail
@@ -79,7 +87,7 @@ function MainApp() {
               />
             )}
           </div>
-        ) : null}
+        )}
 
         {/* System Diagnostics / Lab 1 Compatibility Card */}
         <div
@@ -128,8 +136,10 @@ function MainApp() {
 
 export default function App() {
   return (
-    <RequesterProvider>
-      <MainApp />
-    </RequesterProvider>
+    <AuthProvider>
+      <RequesterProvider>
+        <MainApp />
+      </RequesterProvider>
+    </AuthProvider>
   );
 }
