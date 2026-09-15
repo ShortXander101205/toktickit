@@ -2,12 +2,12 @@ export type UserRole = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
 
 export interface AuthUser {
   id: number;
-  email: string;
   name: string;
+  email: string;
   role: UserRole;
-  department?: string | null;
   mustChangePassword: boolean;
   isActive: boolean;
+  department?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -18,9 +18,9 @@ export interface LoginPayload {
 }
 
 export interface ChangePasswordPayload {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
 }
 
 export interface RequesterUser {

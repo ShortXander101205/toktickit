@@ -12,7 +12,7 @@ const VALID_PRIORITIES = new Set(["Low", "Medium", "High", "Urgent"]);
 
 export async function handleCreateTicket(req: Request, res: Response) {
   const prisma = getPrisma();
-  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  // 1. Verify and extract requester ID
   let requesterId: number;
   if (req.user) {
     requesterId = req.user.id;
@@ -270,7 +270,7 @@ const VALID_SORT_FIELDS = new Set(["ticketNumber", "createdAt", "updatedAt", "cu
 export async function handleGetTickets(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  // 1. Verify and extract requester ID
   let requesterId: number;
   if (req.user) {
     requesterId = req.user.id;
@@ -472,7 +472,7 @@ export async function handleGetTickets(req: Request, res: Response) {
 export async function handleGetTicketDetail(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  // 1. Verify and extract requester ID
   let requesterId: number;
   if (req.user) {
     requesterId = req.user.id;
@@ -591,8 +591,6 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
         isRemoved: true,
         removalReason: a.removalReason,
         removedAt: a.removedAt ? a.removedAt.toISOString() : null,
-        removedByUserId: a.removedByUserId,
-        removedByUserName: a.removedByUser?.name || null,
         removedByRequesterId: a.removedByUserId,
         removedByRequesterName: a.removedByUser?.name || null,
         createdAt: a.createdAt.toISOString(),
@@ -639,7 +637,7 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
 export async function handleUploadTicketAttachment(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  // 1. Verify and extract requester ID from header
   let requesterId: number;
   if (req.user) {
     requesterId = req.user.id;

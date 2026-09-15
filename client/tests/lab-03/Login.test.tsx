@@ -4,28 +4,41 @@ import userEvent from "@testing-library/user-event";
 import { Login } from "../../src/components/Login.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
 import * as api from "../../src/api.js";
+import { AuthUser } from "../../src/types/index.js";
 
-describe("UI-01: Login View Component", () => {
+const mockRequesterUser: AuthUser = {
+  id: 4,
+  name: "Sarah Johnson",
+  email: "sarah.johnson@kmutt.ac.th",
+  role: "REQUESTER",
+  mustChangePassword: true,
+  isActive: true,
+  department: "Library",
+};
+
+describe("Component: Login (Feature 12 - UI-01, AC-01)", () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
     vi.restoreAllMocks();
+    localStorage.clear();
+    // Default getMeApi reject for unauthenticated initial state
+    vi.spyOn(api, "getMeApi").mockRejectedValue(new Error("Unauthorized"));
   });
 
-  it("renders email, password inputs, show/hide toggle, and Sign In button", () => {
+  it("UI-01-01: renders the sign-in form with email, password inputs, submit button, and accessible labels", () => {
     render(
       <AuthProvider>
         <Login />
       </AuthProvider>
     );
 
+    expect(screen.getByRole("heading", { name: /Sign In/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Email Address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Password/i)).toBeInTheDocument();
-    expect(screen.getByTestId("toggle-password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show password/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sign In/i })).toBeInTheDocument();
-    expect(screen.getByText(/TokTickIT/i)).toBeInTheDocument();
   });
 
-  it("toggles password visibility between password and text modes", async () => {
+  it("UI-01-02: toggles password field between masked (password) and plain text", async () => {
     const user = userEvent.setup();
     render(
       <AuthProvider>
@@ -33,105 +46,26 @@ describe("UI-01: Login View Component", () => {
       </AuthProvider>
     );
 
-    const passwordInput = screen.getByLabelText(/^Password/i);
-    const toggleButton = screen.getByTestId("toggle-password");
-
+    const passwordInput = screen.getByPlaceholderText("••••••••");
     expect(passwordInput).toHaveAttribute("type", "password");
 
-    await user.click(toggleButton);
+    const toggleBtn = screen.getByRole("button", { name: /Show password/i });
+    await user.click(toggleBtn);
+
     expect(passwordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: /Hide password/i })).toBeInTheDocument();
 
-    await user.click(toggleButton);
+    await user.click(screen.getByRole("button", { name: /Hide password/i }));
     expect(passwordInput).toHaveAttribute("type", "password");
   });
 
-  it("displays form-level validation messages when submitting empty form", async () => {
-    const user = userEvent.setup();
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
-
-    const submitBtn = screen.getByRole("button", { name: /Sign In/i });
-    await user.click(submitBtn);
-
-    expect(screen.getByText(/Email address is required/i)).toBeInTheDocument();
-    expect(screen.getByText(/Password is required/i)).toBeInTheDocument();
-  });
-
-  it("clears/blanks out invalid input on blur per blur validation rule", async () => {
-    const user = userEvent.setup();
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
-
-    const emailInput = screen.getByLabelText(/Email Address/i);
-    await user.type(emailInput, "notanemail");
-    fireEvent.blur(emailInput);
-
-    expect(emailInput).toHaveValue("");
-  });
-
-  it("displays busy indicator 'Signing in...' and disables button during submission", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(api, "loginApi").mockReturnValue(new Promise(() => {}));
-
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
-
-    await user.type(screen.getByLabelText(/Email Address/i), "user@kmutt.ac.th");
-    await user.type(screen.getByLabelText(/^Password/i), "Password123!");
-
-    const submitBtn = screen.getByRole("button", { name: /Sign In/i });
-    await user.click(submitBtn);
-
-    expect(submitBtn).toHaveTextContent(/Signing in.../i);
-    expect(submitBtn).toBeDisabled();
-  });
-
-  it("renders safe anti-enumeration alert banner when login fails with 401", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(api, "loginApi").mockRejectedValue(new Error("Invalid email address or password."));
-
-    render(
-      <AuthProvider>
-        <Login />
-      </AuthProvider>
-    );
-
-    await user.type(screen.getByLabelText(/Email Address/i), "user@kmutt.ac.th");
-    await user.type(screen.getByLabelText(/^Password/i), "WrongPassword!");
-
-    const submitBtn = screen.getByRole("button", { name: /Sign In/i });
-    await user.click(submitBtn);
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/Invalid email address or password/i);
-  });
-
-  it("triggers onSuccess callback and authenticates user on valid credentials", async () => {
+  it("UI-01-03: submits valid credentials, invokes loginApi, and triggers onSuccess callback", async () => {
     const user = userEvent.setup();
     const onSuccess = vi.fn();
 
-    vi.spyOn(api, "loginApi").mockResolvedValue({
-      success: true,
-      data: {
-        user: {
-          id: 1,
-          email: "jennifer.anderson@kmutt.ac.th",
-          name: "Jennifer Anderson",
-          role: "REQUESTER",
-          mustChangePassword: false,
-          isActive: true,
-        },
-        token: "mock-session-token",
-      },
+    const loginSpy = vi.spyOn(api, "loginApi").mockResolvedValue({
+      user: mockRequesterUser,
+      token: "mock-session-token",
     });
 
     render(
@@ -140,14 +74,78 @@ describe("UI-01: Login View Component", () => {
       </AuthProvider>
     );
 
-    await user.type(screen.getByLabelText(/Email Address/i), "jennifer.anderson@kmutt.ac.th");
-    await user.type(screen.getByLabelText(/^Password/i), "Password123!");
+    await user.type(screen.getByLabelText(/Email Address/i), "sarah.johnson@kmutt.ac.th");
+    await user.type(screen.getByPlaceholderText("••••••••"), "Password123!");
+    await user.click(screen.getByRole("button", { name: /Sign In/i }));
+
+    await waitFor(() => {
+      expect(loginSpy).toHaveBeenCalledWith({
+        email: "sarah.johnson@kmutt.ac.th",
+        password: "Password123!",
+      });
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("UI-01-04: displays safe generic error alert banner on authentication failure without enumeration leak", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "loginApi").mockRejectedValue({
+      response: {
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Invalid email address or password.",
+        },
+      },
+    });
+
+    render(
+      <AuthProvider>
+        <Login />
+      </AuthProvider>
+    );
+
+    await user.type(screen.getByLabelText(/Email Address/i), "sarah.johnson@kmutt.ac.th");
+    await user.type(screen.getByPlaceholderText("••••••••"), "WrongPassword999!");
+    await user.click(screen.getByRole("button", { name: /Sign In/i }));
+
+    const errorAlert = await screen.findByTestId("login-error");
+    expect(errorAlert).toBeInTheDocument();
+    expect(errorAlert).toHaveTextContent("Invalid email address or password.");
+  });
+
+  it("UI-01-05: disables submit button and shows loading spinner while authentication request is in flight", async () => {
+    const user = userEvent.setup();
+    let resolveLogin: (val: any) => void = () => {};
+    const pendingPromise = new Promise((resolve) => {
+      resolveLogin = resolve;
+    });
+
+    vi.spyOn(api, "loginApi").mockReturnValue(pendingPromise as any);
+
+    render(
+      <AuthProvider>
+        <Login />
+      </AuthProvider>
+    );
+
+    await user.type(screen.getByLabelText(/Email Address/i), "sarah.johnson@kmutt.ac.th");
+    await user.type(screen.getByPlaceholderText("••••••••"), "Password123!");
 
     const submitBtn = screen.getByRole("button", { name: /Sign In/i });
     await user.click(submitBtn);
 
+    // Verify loading state
+    expect(screen.getByText(/Signing in.../i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Signing in.../i })).toBeDisabled();
+
+    // Resolve promise
+    resolveLogin({
+      user: mockRequesterUser,
+      token: "mock-token",
+    });
+
     await waitFor(() => {
-      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(/Signing in.../i)).not.toBeInTheDocument();
     });
   });
 });

@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
+import bcryptjs from "bcryptjs";
 import { getPrisma } from "../src/prisma.js";
 
 export const CATEGORIES_SEED = [
@@ -38,118 +39,103 @@ export const RELATED_SYSTEMS_SEED = [
   { name: "Corporate Laptop", isActive: true },
 ];
 
-import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
-
-// Standard initial password hash for all seed accounts ('Password123!')
-const DEFAULT_PASSWORD_HASH = bcrypt.hashSync("Password123!", 10);
-
 export const USERS_SEED = [
-  // 1. Administrator (1 Active)
-  {
-    name: "Admin User",
-    email: "admin@kmutt.ac.th",
-    role: Role.ADMINISTRATOR,
-    department: "Information Technology Office",
-    isActive: true,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
-  },
-  // 2. IT Staff (3 Active, 1 Inactive)
-  {
-    name: "Sompong IT",
-    email: "sompong.it@kmutt.ac.th",
-    role: Role.IT_STAFF,
-    department: "Information Technology Office",
-    isActive: true,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
-  },
-  {
-    name: "Wichai IT",
-    email: "wichai.it@kmutt.ac.th",
-    role: Role.IT_STAFF,
-    department: "Network & Systems Division",
-    isActive: true,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
-  },
-  {
-    name: "Thana IT",
-    email: "thana.it@kmutt.ac.th",
-    role: Role.IT_STAFF,
-    department: "User Support Division",
-    isActive: true,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
-  },
-  {
-    name: "Kanya Inactive IT",
-    email: "kanya.ina@kmutt.ac.th",
-    role: Role.IT_STAFF,
-    department: "Information Technology Office",
-    isActive: false,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
-  },
-  // 3. Requesters (4 Active, 2 Inactive)
+  // 1. Requesters (4 active, 1 inactive, 1 testing)
   {
     name: "Jennifer Anderson",
     email: "jennifer.anderson@kmutt.ac.th",
+    department: "Engineering",
     role: Role.REQUESTER,
-    department: "Computer Engineering",
-    isActive: true,
     mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
+    isActive: true,
   },
   {
     name: "Michael Brown",
     email: "michael.brown@kmutt.ac.th",
+    department: "Science",
     role: Role.REQUESTER,
-    department: "Information Technology",
-    isActive: true,
     mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
+    isActive: true,
   },
   {
     name: "David Lee",
     email: "david.lee@kmutt.ac.th",
+    department: "Architecture",
     role: Role.REQUESTER,
-    department: "Electrical Engineering",
-    isActive: true,
     mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
+    isActive: true,
   },
   {
     name: "Sarah Johnson",
     email: "sarah.johnson@kmutt.ac.th",
+    department: "Science",
     role: Role.REQUESTER,
-    department: "Science Faculty",
+    mustChangePassword: true,
     isActive: true,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
-  },
-  {
-    name: "Inactive Test User",
-    email: "inactive.user@kmutt.ac.th",
-    role: Role.REQUESTER,
-    department: "Registrar Office",
-    isActive: false,
-    mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
   },
   {
     name: "Prasert Inactive",
-    email: "prasert.ina@kmutt.ac.th",
+    email: "inactive.user@kmutt.ac.th",
+    department: "Liberal Arts",
     role: Role.REQUESTER,
-    department: "Human Resources Office",
-    isActive: false,
     mustChangePassword: true,
-    passwordHash: DEFAULT_PASSWORD_HASH,
+    isActive: false,
+  },
+  {
+    name: "Test Active Requester",
+    email: "test.requester@kmutt.ac.th",
+    department: "Testing Pool",
+    role: Role.REQUESTER,
+    mustChangePassword: false,
+    isActive: true,
+  },
+
+  // 2. IT Staff (3 active, 1 inactive)
+  {
+    name: "Sompong IT",
+    email: "sompong.it@kmutt.ac.th",
+    department: "Central IT",
+    role: Role.IT_STAFF,
+    mustChangePassword: true,
+    isActive: true,
+  },
+  {
+    name: "Wichai Support",
+    email: "wichai.sup@kmutt.ac.th",
+    department: "Helpdesk Tier 1",
+    role: Role.IT_STAFF,
+    mustChangePassword: true,
+    isActive: true,
+  },
+  {
+    name: "Anong Network",
+    email: "anong.net@kmutt.ac.th",
+    department: "Network Operations",
+    role: Role.IT_STAFF,
+    mustChangePassword: true,
+    isActive: true,
+  },
+  {
+    name: "Kanya Retired",
+    email: "kanya.ret@kmutt.ac.th",
+    department: "Legacy Systems",
+    role: Role.IT_STAFF,
+    mustChangePassword: true,
+    isActive: false,
+  },
+
+  // 3. Administrator (1 active)
+  {
+    name: "System Administrator",
+    email: "admin@kmutt.ac.th",
+    department: "IT Administration",
+    role: Role.ADMINISTRATOR,
+    mustChangePassword: true,
+    isActive: true,
   },
 ];
 
-// Alias for backward compatibility if any test references REQUESTER_USERS_SEED
+// Alias for backwards compatibility with earlier tests/references
 export const REQUESTER_USERS_SEED = USERS_SEED.filter((u) => u.role === Role.REQUESTER);
 
 /**
@@ -181,20 +167,25 @@ export async function seed(prisma: PrismaClient): Promise<void> {
   }
 
   // 3. Seed Users (Keyed on lowercase unique email)
+  const defaultPasswordHash = bcryptjs.hashSync("Password123!", 10);
   for (const user of USERS_SEED) {
     await prisma.user.upsert({
       where: { email: user.email.toLowerCase() },
       update: {
         name: user.name,
-        role: user.role,
         department: user.department,
-        isActive: user.isActive,
+        role: user.role,
         mustChangePassword: user.mustChangePassword,
-        passwordHash: user.passwordHash,
+        isActive: user.isActive,
       },
       create: {
-        ...user,
+        name: user.name,
         email: user.email.toLowerCase(),
+        department: user.department,
+        role: user.role,
+        mustChangePassword: user.mustChangePassword,
+        isActive: user.isActive,
+        passwordHash: defaultPasswordHash,
       },
     });
   }

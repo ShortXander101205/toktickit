@@ -1,52 +1,51 @@
 import { Request, Response, NextFunction } from "express";
-import { Role } from "@prisma/client";
-import { getPrisma } from "../prisma.js";
 import { sessionService } from "../services/session.service.js";
+import { getPrisma } from "../prisma.js";
 
-export interface AuthUserContext {
+export interface AuthUser {
   id: number;
   email: string;
   name: string;
-  role: Role;
-  mustChangePassword: boolean;
   department: string | null;
-  isActive: boolean;
+  role: "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+  mustChangePassword: boolean;
 }
 
 declare global {
   namespace Express {
     interface Request {
-      user?: AuthUserContext;
+      user?: AuthUser;
     }
   }
 }
 
 /**
- * Authentication middleware.
- * Verifies session token from cookie or Authorization header,
- * checks that the user account is active, and populates req.user.
+ * Middleware that verifies active session token and attaches req.user.
+ * Rejects unauthenticated requests with 401 Unauthorized.
  */
-export async function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = sessionService.extractToken(req);
   if (!token) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: {
         code: "UNAUTHORIZED",
         message: "Authentication required.",
       },
     });
+    return;
   }
 
   const session = sessionService.getSession(token);
   if (!session) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: {
         code: "UNAUTHORIZED",
-        message: "Session expired or invalid.",
+        message: "Authentication session expired or invalid.",
       },
     });
+    return;
   }
 
   const prisma = getPrisma();
@@ -56,34 +55,37 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
   if (!user || !user.isActive) {
     sessionService.destroySession(token);
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       error: {
         code: "UNAUTHORIZED",
-        message: "User account inactive or not found.",
+        message: "User account is inactive or no longer exists.",
       },
     });
+    return;
   }
 
   req.user = {
     id: user.id,
     email: user.email,
     name: user.name,
-    role: user.role,
-    mustChangePassword: user.mustChangePassword,
     department: user.department,
-    isActive: user.isActive,
+    role: user.role as "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR",
+    mustChangePassword: user.mustChangePassword,
   };
 
   next();
 }
 
 /**
- * Soft authentication middleware.
- * If a session token is present and valid, populates req.user.
- * Does NOT reject unauthenticated requests (lets legacy callers pass).
+ * Optional authentication middleware: if a valid session exists, attaches req.user,
+ * otherwise proceeds with req.user undefined.
  */
-export async function optionalAuthenticate(req: Request, _res: Response, next: NextFunction) {
+export async function optionalAuthenticate(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
   const token = sessionService.extractToken(req);
   if (!token) {
     return next();
@@ -94,72 +96,51 @@ export async function optionalAuthenticate(req: Request, _res: Response, next: N
     return next();
   }
 
-  try {
-    const prisma = getPrisma();
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-    });
+  const prisma = getPrisma();
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+  });
 
-    if (user && user.isActive) {
-      req.user = {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        mustChangePassword: user.mustChangePassword,
-        department: user.department,
-        isActive: user.isActive,
-      };
-    }
-  } catch {
-    // Ignore errors in soft auth
+  if (user && user.isActive) {
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      department: user.department,
+      role: user.role as "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR",
+      mustChangePassword: user.mustChangePassword,
+    };
   }
 
   next();
 }
 
 /**
- * BR-02: Mandatory First-Login Password Change Route Gating.
- * Blocks access to operational routes when mustChangePassword === true.
+ * Middleware enforcing BR-02: users with mustChangePassword === true are blocked
+ * from operational routes with HTTP 403 Forbidden.
  */
-export function requirePasswordChanged(req: Request, res: Response, next: NextFunction) {
+export function requirePasswordChanged(req: Request, res: Response, next: NextFunction): void {
   if (req.user && req.user.mustChangePassword) {
-    return res.status(403).json({
+    res.status(403).json({
       success: false,
       error: {
         code: "PASSWORD_CHANGE_REQUIRED",
-        message: "Mandatory password change required before accessing application resources.",
+        message: "You must change your password before accessing the application.",
       },
     });
+    return;
   }
   next();
 }
 
 /**
- * Role-Based Access Control (RBAC) guard.
+ * Middleware enforcing BR-03: derives requesterId from the authenticated user context.
  */
-export function requireRole(...allowedRoles: Role[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Authentication required.",
-        },
-      });
+export function deriveRequesterIdentity(req: Request, _res: Response, next: NextFunction): void {
+  if (req.user) {
+    if (req.body && typeof req.body === "object") {
+      req.body.requesterId = req.user.id;
     }
-
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        error: {
-          code: "FORBIDDEN",
-          message: "Insufficient permissions for this resource.",
-        },
-      });
-    }
-
-    next();
-  };
+  }
+  next();
 }

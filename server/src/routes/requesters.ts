@@ -3,6 +3,7 @@ import { getPrisma } from "../prisma.js";
 
 export const requestersRouter = Router();
 
+// Handler for GET /api/requesters
 export async function getActiveRequesters(_req: Request, res: Response): Promise<void> {
   try {
     const requesters = await getPrisma().user.findMany({

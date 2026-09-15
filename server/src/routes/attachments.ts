@@ -12,7 +12,6 @@ export const attachmentsRouter = Router();
 export async function handleDownloadAttachment(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
   let requesterId: number;
   if (req.user) {
     requesterId = req.user.id;
@@ -156,7 +155,6 @@ export async function handleDownloadAttachment(req: Request, res: Response) {
 export async function handleSoftRemoveAttachment(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
   let requesterId: number;
   if (req.user) {
     requesterId = req.user.id;
@@ -256,7 +254,6 @@ export async function handleSoftRemoveAttachment(req: Request, res: Response) {
           removalReason: attachment.removalReason,
           removedAt: attachment.removedAt?.toISOString() || null,
           removedByUserId: attachment.removedByUserId,
-          removedByRequesterId: attachment.removedByUserId,
         },
       });
     }

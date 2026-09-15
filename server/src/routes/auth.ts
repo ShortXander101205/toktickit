@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import bcryptjs from "bcryptjs";
 import { getPrisma } from "../prisma.js";
 import { sessionService } from "../services/session.service.js";
 import { passwordService } from "../services/password.service.js";
@@ -6,84 +7,101 @@ import { authenticate } from "../middleware/auth.js";
 
 export const authRouter = Router();
 
+// Constant dummy hash used for timing-attack normalization (BR-01)
+const DUMMY_HASH = "$2b$10$wE9l1eF5u51268mX0.9UteS6pZzGZ2yYpP6tF5xN8hT2J1v5mR1qG";
+
 /**
  * POST /api/v1/auth/login
- * Public endpoint to authenticate user with email and password.
- * Strictly prevents account enumeration (BR-01).
+ * Public endpoint for authenticating user credentials.
  */
-authRouter.post("/login", async (req: Request, res: Response) => {
+authRouter.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body || {};
 
-  // Input sanitization
-  const trimmedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
-  const trimmedPassword = typeof password === "string" ? password : "";
-
-  if (!trimmedEmail || !trimmedPassword) {
-    return res.status(401).json({
+  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
+    res.status(400).json({
       success: false,
       error: {
-        code: "INVALID_CREDENTIALS",
-        message: "Invalid email address or password.",
+        code: "MISSING_CREDENTIALS",
+        message: "Email and password are required.",
       },
     });
+    return;
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
   const prisma = getPrisma();
   const user = await prisma.user.findUnique({
-    where: { email: trimmedEmail },
+    where: { email: normalizedEmail },
   });
 
-  // BR-01: Check user existence, account active flag, and password match.
-  // Return identical safe error without leaking account state.
-  if (!user || !user.isActive || !passwordService.verifyPassword(trimmedPassword, user.passwordHash)) {
-    return res.status(401).json({
+  // Anti-enumeration defense (BR-01): uniform error for missing user or deactivated account
+  if (!user || !user.isActive) {
+    bcryptjs.compareSync("dummy_password", DUMMY_HASH);
+    res.status(401).json({
       success: false,
       error: {
         code: "INVALID_CREDENTIALS",
         message: "Invalid email address or password.",
       },
     });
+    return;
   }
 
-  // Issue session token
-  const token = sessionService.createSession(user.id);
+  const isPasswordValid = passwordService.verifyPassword(password, user.passwordHash);
+  if (!isPasswordValid) {
+    res.status(401).json({
+      success: false,
+      error: {
+        code: "INVALID_CREDENTIALS",
+        message: "Invalid email address or password.",
+      },
+    });
+    return;
+  }
 
-  // Set HTTP-only session cookie
+  // Generate session token and set secure HttpOnly cookie
+  const token = sessionService.createSession(user.id);
   res.cookie("toktickit_session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     data: {
+      token,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        department: user.department,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
       },
-      token,
     },
   });
 });
 
 /**
  * POST /api/v1/auth/logout
- * Clears session on server and removes session cookie.
+ * Terminates active user session and clears cookie.
  */
-authRouter.post("/logout", async (req: Request, res: Response) => {
+authRouter.post("/logout", (req: Request, res: Response): void => {
   const token = sessionService.extractToken(req);
   if (token) {
     sessionService.destroySession(token);
   }
 
-  res.clearCookie("toktickit_session", { path: "/" });
+  res.clearCookie("toktickit_session", {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+  });
 
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     data: {
       message: "Successfully logged out.",
@@ -93,15 +111,16 @@ authRouter.post("/logout", async (req: Request, res: Response) => {
 
 /**
  * GET /api/v1/auth/me
- * Returns currently authenticated user context.
+ * Returns authenticated user profile.
  */
-authRouter.get("/me", authenticate, async (req: Request, res: Response) => {
-  return res.status(200).json({
+authRouter.get("/me", authenticate, (req: Request, res: Response): void => {
+  res.status(200).json({
     success: true,
     data: {
       id: req.user!.id,
       email: req.user!.email,
       name: req.user!.name,
+      department: req.user!.department,
       role: req.user!.role,
       mustChangePassword: req.user!.mustChangePassword,
     },
@@ -110,100 +129,96 @@ authRouter.get("/me", authenticate, async (req: Request, res: Response) => {
 
 /**
  * POST /api/v1/auth/change-password
- * Enforces mandatory first-login password change (FR-02, BR-02).
+ * Updates password and sets mustChangePassword = false.
  */
-authRouter.post("/change-password", authenticate, async (req: Request, res: Response) => {
-  const { currentPassword, newPassword, confirmPassword } = req.body || {};
+authRouter.post(
+  "/change-password",
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    return res.status(422).json({
-      success: false,
-      error: {
-        code: "VALIDATION_FAILED",
-        message: "Current password, new password, and confirmation are required.",
-        fieldErrors: [
-          ...(!currentPassword ? [{ field: "currentPassword", message: "Current password is required." }] : []),
-          ...(!newPassword ? [{ field: "newPassword", message: "New password is required." }] : []),
-          ...(!confirmPassword ? [{ field: "confirmPassword", message: "Confirm password is required." }] : []),
-        ],
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_PASSWORD_FIELDS",
+          message: "Current password, new password, and confirmation are required.",
+        },
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      res.status(422).json({
+        success: false,
+        error: {
+          code: "PASSWORD_CONFIRMATION_MISMATCH",
+          message: "New password and confirmation password do not match.",
+        },
+      });
+      return;
+    }
+
+    const prisma = getPrisma();
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+    });
+
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "User not found.",
+        },
+      });
+      return;
+    }
+
+    const isCurrentValid = passwordService.verifyPassword(currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      res.status(422).json({
+        success: false,
+        error: {
+          code: "INVALID_CURRENT_PASSWORD",
+          message: "Current password is incorrect.",
+        },
+      });
+      return;
+    }
+
+    const validation = passwordService.validatePasswordComplexity(newPassword, currentPassword);
+    if (!validation.isValid) {
+      res.status(422).json({
+        success: false,
+        error: {
+          code: "WEAK_PASSWORD",
+          message: "New password does not meet complexity requirements.",
+          fieldErrors: validation.errors.map((msg) => ({
+            field: "newPassword",
+            message: msg,
+          })),
+        },
+      });
+      return;
+    }
+
+    const newHash = passwordService.hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: newHash,
+        mustChangePassword: false,
+      },
+    });
+
+    req.user!.mustChangePassword = false;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        message: "Password updated successfully.",
       },
     });
   }
-
-  if (newPassword !== confirmPassword) {
-    return res.status(422).json({
-      success: false,
-      error: {
-        code: "VALIDATION_FAILED",
-        message: "New password and confirmation do not match.",
-        fieldErrors: [
-          { field: "confirmPassword", message: "Password confirmation does not match new password." },
-        ],
-      },
-    });
-  }
-
-  const prisma = getPrisma();
-  const user = await prisma.user.findUnique({
-    where: { id: req.user!.id },
-  });
-
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: "UNAUTHORIZED",
-        message: "User account not found.",
-      },
-    });
-  }
-
-  // Verify current password
-  if (!passwordService.verifyPassword(currentPassword, user.passwordHash)) {
-    return res.status(422).json({
-      success: false,
-      error: {
-        code: "VALIDATION_FAILED",
-        message: "Current password does not match.",
-        fieldErrors: [
-          { field: "currentPassword", message: "Current password does not match." },
-        ],
-      },
-    });
-  }
-
-  // Validate complexity rules
-  const validation = passwordService.validatePasswordComplexity(newPassword, currentPassword);
-  if (!validation.isValid) {
-    return res.status(422).json({
-      success: false,
-      error: {
-        code: "VALIDATION_FAILED",
-        message: "Password does not meet complexity requirements.",
-        fieldErrors: validation.errors.map((msg) => ({ field: "newPassword", message: msg })),
-      },
-    });
-  }
-
-  // Update password and reset mustChangePassword flag
-  const newPasswordHash = passwordService.hashPassword(newPassword);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordHash: newPasswordHash,
-      mustChangePassword: false,
-    },
-  });
-
-  // Update in-request context
-  if (req.user) {
-    req.user.mustChangePassword = false;
-  }
-
-  return res.status(200).json({
-    success: true,
-    data: {
-      message: "Password updated successfully.",
-    },
-  });
-});
+);

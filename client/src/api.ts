@@ -1,4 +1,7 @@
 import {
+  AuthUser,
+  LoginPayload,
+  ChangePasswordPayload,
   RequesterUser,
   RelatedSystem,
   Category,
@@ -7,36 +10,155 @@ import {
   TicketDetail,
   Attachment,
   CreateTicketPayload,
-  AuthUser,
-  LoginPayload,
-  ChangePasswordPayload,
 } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
-const TOKEN_KEY = "toktickit_session_token";
+
+// Re-export Category for backward compatibility
+export type { Category } from "./types/index.js";
+
+let inMemoryToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  inMemoryToken = token;
+  if (token) {
+    try {
+      localStorage.setItem("toktickit_auth_token", token);
+    } catch {}
+  } else {
+    try {
+      localStorage.removeItem("toktickit_auth_token");
+    } catch {}
+  }
+}
 
 export function getAuthToken(): string | null {
+  if (inMemoryToken) return inMemoryToken;
   try {
-    return window.sessionStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem("toktickit_auth_token");
   } catch {
     return null;
   }
 }
 
-export function setAuthToken(token: string | null): void {
+// Authentication API methods
+export async function loginApi(payload: LoginPayload): Promise<{ user: AuthUser; token?: string }> {
+  const res = await fetch(`${API_URL}/api/v1/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<{ user: AuthUser; token?: string }> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Login failed (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  if (json.data?.token) {
+    setAuthToken(json.data.token);
+  }
+
+  return json.data;
+}
+
+export async function logoutApi(): Promise<void> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   try {
-    if (token) {
-      window.sessionStorage.setItem(TOKEN_KEY, token);
-    } else {
-      window.sessionStorage.removeItem(TOKEN_KEY);
-    }
-  } catch {
-    // Ignore storage errors
+    await fetch(`${API_URL}/api/v1/auth/logout`, {
+      method: "POST",
+      headers,
+      credentials: "include",
+    });
+  } finally {
+    setAuthToken(null);
   }
 }
 
-// Re-export Category for backward compatibility
-export type { Category } from "./types/index.js";
+export async function getMeApi(): Promise<AuthUser> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/auth/me`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<{ user: AuthUser }> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch authenticated user (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data.user;
+}
+
+export async function changePasswordApi(payload: ChangePasswordPayload): Promise<{ user: AuthUser }> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/auth/change-password`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<{ user: AuthUser }> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Password change failed (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
 
 export interface SystemStatus {
   online: boolean;
@@ -47,6 +169,10 @@ export function getRequesterHeaders(activeRequesterId?: number | null): HeadersI
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   if (activeRequesterId) {
     headers["x-requester-id"] = String(activeRequesterId);
   }
@@ -344,134 +470,3 @@ export async function removeAttachment(
 
   return json;
 }
-
-// ==========================================
-// Authentication APIs (Sprint 3 / Issue 12)
-// ==========================================
-
-export interface LoginResponseData {
-  user: AuthUser;
-  token?: string;
-}
-
-export interface ChangePasswordResponseData {
-  user: AuthUser;
-  message: string;
-}
-
-function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = {
-    ...extraHeaders,
-  };
-  const token = getAuthToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-}
-
-export async function loginApi(payload: LoginPayload): Promise<ApiResponse<LoginResponseData>> {
-  const res = await fetch(`${API_URL}/api/v1/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify(payload),
-  });
-
-  const json: ApiResponse<LoginResponseData> = await res.json().catch(() => ({
-    success: false,
-    error: {
-      code: "PARSE_ERROR",
-      message: `Failed to parse response: HTTP ${res.status}`,
-    },
-  } as any));
-
-  if (!res.ok) {
-    const errorMsg = json.error?.message || "Invalid email address or password.";
-    const err: any = new Error(errorMsg);
-    err.status = res.status;
-    err.response = json;
-    throw err;
-  }
-
-  if (json.data?.token) {
-    setAuthToken(json.data.token);
-  }
-
-  return json;
-}
-
-export async function logoutApi(): Promise<ApiResponse<{ message: string }>> {
-  const res = await fetch(`${API_URL}/api/v1/auth/logout`, {
-    method: "POST",
-    headers: getAuthHeaders({ "Content-Type": "application/json" }),
-    credentials: "include",
-  });
-
-  setAuthToken(null);
-
-  const json: ApiResponse<{ message: string }> = await res.json().catch(() => ({
-    success: true,
-    data: { message: "Logged out successfully" },
-  }));
-
-  return json;
-}
-
-export async function getMeApi(): Promise<ApiResponse<{ user: AuthUser }>> {
-  const res = await fetch(`${API_URL}/api/v1/auth/me`, {
-    method: "GET",
-    headers: getAuthHeaders(),
-    credentials: "include",
-  });
-
-  const json: ApiResponse<{ user: AuthUser }> = await res.json().catch(() => ({
-    success: false,
-    error: {
-      code: "PARSE_ERROR",
-      message: `Failed to parse response: HTTP ${res.status}`,
-    },
-  } as any));
-
-  if (!res.ok) {
-    const errorMsg = json.error?.message || `Failed to fetch session: HTTP ${res.status}`;
-    const err: any = new Error(errorMsg);
-    err.status = res.status;
-    err.response = json;
-    throw err;
-  }
-
-  return json;
-}
-
-export async function changePasswordApi(
-  payload: ChangePasswordPayload
-): Promise<ApiResponse<ChangePasswordResponseData>> {
-  const res = await fetch(`${API_URL}/api/v1/auth/change-password`, {
-    method: "POST",
-    headers: getAuthHeaders({ "Content-Type": "application/json" }),
-    credentials: "include",
-    body: JSON.stringify(payload),
-  });
-
-  const json: ApiResponse<ChangePasswordResponseData> = await res.json().catch(() => ({
-    success: false,
-    error: {
-      code: "PARSE_ERROR",
-      message: `Failed to parse response: HTTP ${res.status}`,
-    },
-  } as any));
-
-  if (!res.ok) {
-    const errorMsg = json.error?.message || `Password change failed: HTTP ${res.status}`;
-    const err: any = new Error(errorMsg);
-    err.status = res.status;
-    err.response = json;
-    throw err;
-  }
-
-  return json;
-}
-

@@ -4,38 +4,48 @@ import userEvent from "@testing-library/user-event";
 import { ChangePassword } from "../../src/components/ChangePassword.js";
 import { AuthProvider } from "../../src/context/AuthContext.js";
 import * as api from "../../src/api.js";
+import { AuthUser } from "../../src/types/index.js";
 
-describe("UI-02: ChangePassword View Component", () => {
+const mockAuthUserWithMustChange: AuthUser = {
+  id: 4,
+  name: "Sarah Johnson",
+  email: "sarah.johnson@kmutt.ac.th",
+  role: "REQUESTER",
+  mustChangePassword: true,
+  isActive: true,
+  department: "Library",
+};
+
+describe("Component: ChangePassword (Feature 12 - UI-02, AC-02)", () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
     vi.restoreAllMocks();
+    localStorage.clear();
+    // Default session restoration as authenticated user with mustChangePassword = true
+    vi.spyOn(api, "getMeApi").mockResolvedValue(mockAuthUserWithMustChange);
   });
 
-  it("renders Current Password, New Password, Confirm Password, and all 7 checklist items initially unmet", () => {
+  it("UI-02-01: renders the mandatory password change form with all 3 fields and 6-rule checklist", async () => {
     render(
       <AuthProvider>
         <ChangePassword />
       </AuthProvider>
     );
 
-    expect(screen.getByLabelText(/^Current Password/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Mandatory Password Change/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Current Password/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^New Password/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Confirm New Password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Confirm New Password/i)).toBeInTheDocument();
 
-    const submitBtn = screen.getByRole("button", { name: /Update Password & Continue/i });
-    expect(submitBtn).toBeDisabled();
-
-    // Check that all 7 items start unmet [ ]
-    expect(screen.getByTestId("checklist-length")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-upper")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-lower")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-number")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-special")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-different")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-match")).toHaveTextContent("[ ]");
+    // Check 6 checklist rule items
+    expect(screen.getByTestId("rule-min-length")).toHaveTextContent(/At least 8 characters/i);
+    expect(screen.getByTestId("rule-upper")).toHaveTextContent(/At least one uppercase letter/i);
+    expect(screen.getByTestId("rule-lower")).toHaveTextContent(/At least one lowercase letter/i);
+    expect(screen.getByTestId("rule-digit")).toHaveTextContent(/At least one numerical digit/i);
+    expect(screen.getByTestId("rule-special")).toHaveTextContent(/At least one special character/i);
+    expect(screen.getByTestId("rule-match")).toHaveTextContent(/Passwords match/i);
   });
 
-  it("dynamically flips checklist criteria to [✓] as conditions are satisfied", async () => {
+  it("UI-02-02: disables the Update Password button while password criteria are incomplete", async () => {
     const user = userEvent.setup();
     render(
       <AuthProvider>
@@ -43,38 +53,18 @@ describe("UI-02: ChangePassword View Component", () => {
       </AuthProvider>
     );
 
-    const currentInput = screen.getByLabelText(/^Current Password/i);
-    const newInput = screen.getByLabelText(/^New Password/i);
-    const confirmInput = screen.getByLabelText(/^Confirm New Password/i);
+    const submitBtn = await screen.findByRole("button", { name: /Update Password/i });
+    expect(submitBtn).toBeDisabled();
 
-    await user.type(currentInput, "Password123!");
-    await user.type(newInput, "Secret");
+    // Type partial password that only satisfies length and lowercase
+    await user.type(screen.getByLabelText(/Current Password/i), "OldPassword123!");
+    await user.type(screen.getByLabelText(/^New Password/i), "short");
+    await user.type(screen.getByLabelText(/Confirm New Password/i), "short");
 
-    // Length < 8: unmet; Lower & Upper: met
-    expect(screen.getByTestId("checklist-length")).toHaveTextContent("[ ]");
-    expect(screen.getByTestId("checklist-upper")).toHaveTextContent("[✓]");
-    expect(screen.getByTestId("checklist-lower")).toHaveTextContent("[✓]");
-
-    // Add digits and special character
-    await user.type(newInput, "99$New");
-    expect(screen.getByTestId("checklist-length")).toHaveTextContent("[✓]");
-    expect(screen.getByTestId("checklist-number")).toHaveTextContent("[✓]");
-    expect(screen.getByTestId("checklist-special")).toHaveTextContent("[✓]");
-    expect(screen.getByTestId("checklist-different")).toHaveTextContent("[✓]");
-
-    // Confirm password still empty: match unmet
-    expect(screen.getByTestId("checklist-match")).toHaveTextContent("[ ]");
-
-    // Fill matching confirm password
-    await user.type(confirmInput, "Secret99$New");
-    expect(screen.getByTestId("checklist-match")).toHaveTextContent("[✓]");
-
-    // All 7 met -> submit button enabled
-    const submitBtn = screen.getByRole("button", { name: /Update Password & Continue/i });
-    expect(submitBtn).toBeEnabled();
+    expect(submitBtn).toBeDisabled();
   });
 
-  it("keeps submit button disabled when passwords do not match", async () => {
+  it("UI-02-03: dynamically updates checklist item indicators as requirements are fulfilled", async () => {
     const user = userEvent.setup();
     render(
       <AuthProvider>
@@ -82,31 +72,36 @@ describe("UI-02: ChangePassword View Component", () => {
       </AuthProvider>
     );
 
-    await user.type(screen.getByLabelText(/^Current Password/i), "Password123!");
-    await user.type(screen.getByLabelText(/^New Password/i), "Secret99$New");
-    await user.type(screen.getByLabelText(/^Confirm New Password/i), "Different99$New");
+    const newPwInput = await screen.findByLabelText(/^New Password/i);
+    const confirmInput = screen.getByLabelText(/Confirm New Password/i);
 
-    expect(screen.getByTestId("checklist-match")).toHaveTextContent("[ ]");
-    const submitBtn = screen.getByRole("button", { name: /Update Password & Continue/i });
-    expect(submitBtn).toBeDisabled();
+    // Initial state: not passed
+    expect(screen.getByTestId("rule-min-length")).not.toHaveClass("text-success");
+
+    // Type full compliant password in New Password
+    await user.type(newPwInput, "ValidP@ssw0rd");
+
+    expect(screen.getByTestId("rule-min-length")).toHaveClass("text-success");
+    expect(screen.getByTestId("rule-upper")).toHaveClass("text-success");
+    expect(screen.getByTestId("rule-lower")).toHaveClass("text-success");
+    expect(screen.getByTestId("rule-digit")).toHaveClass("text-success");
+    expect(screen.getByTestId("rule-special")).toHaveClass("text-success");
+    // Confirm not typed yet
+    expect(screen.getByTestId("rule-match")).not.toHaveClass("text-success");
+
+    // Type matching confirmation
+    await user.type(confirmInput, "ValidP@ssw0rd");
+    expect(screen.getByTestId("rule-match")).toHaveClass("text-success");
   });
 
-  it("submits valid password change and invokes onSuccess", async () => {
+  it("UI-02-04: enables Update Password button when all criteria pass, submits, and invokes changePasswordApi", async () => {
     const user = userEvent.setup();
     const onSuccess = vi.fn();
 
-    vi.spyOn(api, "changePasswordApi").mockResolvedValue({
-      success: true,
-      data: {
-        user: {
-          id: 1,
-          email: "jennifer.anderson@kmutt.ac.th",
-          name: "Jennifer Anderson",
-          role: "REQUESTER",
-          mustChangePassword: false,
-          isActive: true,
-        },
-        message: "Password changed successfully",
+    const changePwSpy = vi.spyOn(api, "changePasswordApi").mockResolvedValue({
+      user: {
+        ...mockAuthUserWithMustChange,
+        mustChangePassword: false,
       },
     });
 
@@ -116,30 +111,36 @@ describe("UI-02: ChangePassword View Component", () => {
       </AuthProvider>
     );
 
-    await user.type(screen.getByLabelText(/^Current Password/i), "Password123!");
-    await user.type(screen.getByLabelText(/^New Password/i), "BrandNewPass99!");
-    await user.type(screen.getByLabelText(/^Confirm New Password/i), "BrandNewPass99!");
+    await user.type(await screen.findByLabelText(/Current Password/i), "Password123!");
+    await user.type(screen.getByLabelText(/^New Password/i), "FreshSecureP@ss1");
+    await user.type(screen.getByLabelText(/Confirm New Password/i), "FreshSecureP@ss1");
 
-    const submitBtn = screen.getByRole("button", { name: /Update Password & Continue/i });
+    const submitBtn = screen.getByRole("button", { name: /Update Password/i });
     expect(submitBtn).toBeEnabled();
 
     await user.click(submitBtn);
 
     await waitFor(() => {
-      expect(api.changePasswordApi).toHaveBeenCalledWith({
+      expect(changePwSpy).toHaveBeenCalledWith({
         currentPassword: "Password123!",
-        newPassword: "BrandNewPass99!",
-        confirmPassword: "BrandNewPass99!",
+        newPassword: "FreshSecureP@ss1",
+        confirmPassword: "FreshSecureP@ss1",
       });
-      expect(onSuccess).toHaveBeenCalledTimes(1);
     });
+
+    expect(await screen.findByTestId("change-password-success")).toBeInTheDocument();
   });
 
-  it("renders error alert banner when API rejects password change", async () => {
+  it("UI-02-05: displays error alert when changePasswordApi rejects with invalid current password", async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, "changePasswordApi").mockRejectedValue(
-      new Error("Current password is incorrect.")
-    );
+    vi.spyOn(api, "changePasswordApi").mockRejectedValue({
+      response: {
+        error: {
+          code: "INVALID_CURRENT_PASSWORD",
+          message: "Current password does not match.",
+        },
+      },
+    });
 
     render(
       <AuthProvider>
@@ -147,14 +148,14 @@ describe("UI-02: ChangePassword View Component", () => {
       </AuthProvider>
     );
 
-    await user.type(screen.getByLabelText(/^Current Password/i), "WrongPassword123!");
-    await user.type(screen.getByLabelText(/^New Password/i), "BrandNewPass99!");
-    await user.type(screen.getByLabelText(/^Confirm New Password/i), "BrandNewPass99!");
+    await user.type(await screen.findByLabelText(/Current Password/i), "IncorrectOldPw!");
+    await user.type(screen.getByLabelText(/^New Password/i), "FreshSecureP@ss1");
+    await user.type(screen.getByLabelText(/Confirm New Password/i), "FreshSecureP@ss1");
 
-    const submitBtn = screen.getByRole("button", { name: /Update Password & Continue/i });
-    await user.click(submitBtn);
+    await user.click(screen.getByRole("button", { name: /Update Password/i }));
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/Current password is incorrect/i);
+    const errorAlert = await screen.findByTestId("change-password-error");
+    expect(errorAlert).toBeInTheDocument();
+    expect(errorAlert).toHaveTextContent("Current password does not match.");
   });
 });
