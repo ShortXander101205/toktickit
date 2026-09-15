@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (payload: LoginPayload) => {
+    setIsLoading(true);
     setError(null);
     try {
       const res = await loginApi(payload);
@@ -57,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const msg = err.message || "Invalid email address or password.";
       setError(msg);
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -74,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const changePassword = useCallback(async (payload: ChangePasswordPayload) => {
+    setIsLoading(true);
     setError(null);
     try {
       const res = await changePasswordApi(payload);
@@ -82,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const msg = err.message || "Failed to update password.";
       setError(msg);
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
