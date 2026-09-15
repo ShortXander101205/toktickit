@@ -38,33 +38,130 @@ export const RELATED_SYSTEMS_SEED = [
   { name: "Corporate Laptop", isActive: true },
 ];
 
-export const REQUESTER_USERS_SEED = [
+import bcrypt from "bcryptjs";
+import { Role } from "@prisma/client";
+
+// Standard initial password hash for all seed accounts ('Password123!')
+const DEFAULT_PASSWORD_HASH = bcrypt.hashSync("Password123!", 10);
+
+export const USERS_SEED = [
+  // 1. Requesters (Preserves Lab 2 IDs 1..6 for test suite stability)
   {
+    id: 1,
     name: "Jennifer Anderson",
     email: "jennifer.anderson@kmutt.ac.th",
+    role: Role.REQUESTER,
+    department: "Computer Engineering",
     isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
   },
   {
+    id: 2,
     name: "Michael Brown",
     email: "michael.brown@kmutt.ac.th",
+    role: Role.REQUESTER,
+    department: "Information Technology",
     isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
   },
   {
+    id: 3,
     name: "David Lee",
     email: "david.lee@kmutt.ac.th",
+    role: Role.REQUESTER,
+    department: "Electrical Engineering",
     isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
   },
   {
+    id: 4,
     name: "Sarah Johnson",
     email: "sarah.johnson@kmutt.ac.th",
+    role: Role.REQUESTER,
+    department: "Science Faculty",
     isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
   },
   {
+    id: 5,
     name: "Inactive Test User",
     email: "inactive.user@kmutt.ac.th",
+    role: Role.REQUESTER,
+    department: "Registrar Office",
     isActive: false,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
+  },
+  {
+    id: 6,
+    name: "Prasert Inactive",
+    email: "prasert.ina@kmutt.ac.th",
+    role: Role.REQUESTER,
+    department: "Human Resources Office",
+    isActive: false,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
+  },
+  // 2. Administrator (ID 7)
+  {
+    id: 7,
+    name: "Admin User",
+    email: "admin@kmutt.ac.th",
+    role: Role.ADMINISTRATOR,
+    department: "Information Technology Office",
+    isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
+  },
+  // 3. IT Staff (IDs 8..11)
+  {
+    id: 8,
+    name: "Sompong IT",
+    email: "sompong.it@kmutt.ac.th",
+    role: Role.IT_STAFF,
+    department: "Information Technology Office",
+    isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
+  },
+  {
+    id: 9,
+    name: "Wichai IT",
+    email: "wichai.it@kmutt.ac.th",
+    role: Role.IT_STAFF,
+    department: "Network & Systems Division",
+    isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
+  },
+  {
+    id: 10,
+    name: "Thana IT",
+    email: "thana.it@kmutt.ac.th",
+    role: Role.IT_STAFF,
+    department: "User Support Division",
+    isActive: true,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
+  },
+  {
+    id: 11,
+    name: "Kanya Inactive IT",
+    email: "kanya.ina@kmutt.ac.th",
+    role: Role.IT_STAFF,
+    department: "Information Technology Office",
+    isActive: false,
+    mustChangePassword: true,
+    passwordHash: DEFAULT_PASSWORD_HASH,
   },
 ];
+
+// Alias for backward compatibility if any test references REQUESTER_USERS_SEED
+export const REQUESTER_USERS_SEED = USERS_SEED.filter((u) => u.role === Role.REQUESTER);
 
 /**
  * Idempotent seed function. Safe to run multiple times without duplicate key violations.
@@ -94,13 +191,17 @@ export async function seed(prisma: PrismaClient): Promise<void> {
     });
   }
 
-  // 3. Seed Requester Users (Keyed on lowercase unique email)
-  for (const user of REQUESTER_USERS_SEED) {
-    await prisma.requesterUser.upsert({
+  // 3. Seed Users (Keyed on lowercase unique email)
+  for (const user of USERS_SEED) {
+    await prisma.user.upsert({
       where: { email: user.email.toLowerCase() },
       update: {
         name: user.name,
+        role: user.role,
+        department: user.department,
         isActive: user.isActive,
+        mustChangePassword: user.mustChangePassword,
+        passwordHash: user.passwordHash,
       },
       create: {
         ...user,
@@ -117,7 +218,7 @@ export async function seed(prisma: PrismaClient): Promise<void> {
     `SELECT setval(pg_get_serial_sequence('related_systems', 'id'), coalesce(max(id), 1)) FROM related_systems;`
   );
   await prisma.$executeRawUnsafe(
-    `SELECT setval(pg_get_serial_sequence('requester_users', 'id'), coalesce(max(id), 1)) FROM requester_users;`
+    `SELECT setval(pg_get_serial_sequence('users', 'id'), coalesce(max(id), 1)) FROM users;`
   );
 }
 
@@ -917,7 +1018,7 @@ export const DEMO_TICKETS_SEED = [
  */
 export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
   // 1. Resolve users, categories, and systems dynamically
-  const users = await prisma.requesterUser.findMany();
+  const users = await prisma.user.findMany();
   const userMap = new Map<string, number>();
   for (const u of users) {
     userMap.set(u.email.toLowerCase(), u.id);

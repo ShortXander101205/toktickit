@@ -12,32 +12,37 @@ const VALID_PRIORITIES = new Set(["Low", "Medium", "High", "Urgent"]);
 
 export async function handleCreateTicket(req: Request, res: Response) {
   const prisma = getPrisma();
-  // 1. Verify and extract requester ID
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "MISSING_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-        details: [],
-      },
-    });
+  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
   }
 
-  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(requesterId)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-        details: [],
-      },
-    });
-  }
-
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id: requesterId },
   });
 
@@ -265,32 +270,37 @@ const VALID_SORT_FIELDS = new Set(["ticketNumber", "createdAt", "updatedAt", "cu
 export async function handleGetTickets(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID from header
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "MISSING_REQUESTER_ID",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-        details: [],
-      },
-    });
+  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_ID",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_ID",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
   }
 
-  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(requesterId)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_REQUESTER_ID",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-        details: [],
-      },
-    });
-  }
-
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id: requesterId },
   });
 
@@ -462,32 +472,37 @@ export async function handleGetTickets(req: Request, res: Response) {
 export async function handleGetTicketDetail(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID from header
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "MISSING_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-        details: [],
-      },
-    });
+  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
   }
 
-  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(requesterId)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-        details: [],
-      },
-    });
-  }
-
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id: requesterId },
   });
 
@@ -523,7 +538,7 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
         relatedSystem: true,
         requester: true,
         attachments: {
-          include: { removedByRequester: true },
+          include: { removedByUser: true },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -576,8 +591,10 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
         isRemoved: true,
         removalReason: a.removalReason,
         removedAt: a.removedAt ? a.removedAt.toISOString() : null,
-        removedByRequesterId: a.removedByRequesterId,
-        removedByRequesterName: a.removedByRequester?.name || null,
+        removedByUserId: a.removedByUserId,
+        removedByUserName: a.removedByUser?.name || null,
+        removedByRequesterId: a.removedByUserId,
+        removedByRequesterName: a.removedByUser?.name || null,
         createdAt: a.createdAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
       }));
@@ -622,32 +639,37 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
 export async function handleUploadTicketAttachment(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID from header
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "MISSING_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-        details: [],
-      },
-    });
+  // 1. Verify and extract requester ID (BR-03: Session-derived requester identity)
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
   }
 
-  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(requesterId)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-        details: [],
-      },
-    });
-  }
-
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id: requesterId },
   });
 

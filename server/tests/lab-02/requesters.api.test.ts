@@ -75,17 +75,19 @@ describe("Feature 2: Requester Context & Reference Data APIs", () => {
     });
 
     it("creating a user after seeding succeeds without autoincrement sequence collision", async () => {
-      const created = await prisma.requesterUser.create({
+      const created = await prisma.user.create({
         data: {
           name: "Dynamic Test Requester",
           email: "dynamic.test@kmutt.ac.th",
+          passwordHash: "$2b$10$wE9l1eF5u51268mX0.9UteS6pZzGZ2yYpP6tF5xN8hT2J1v5mR1qG",
+          role: "REQUESTER",
           isActive: true,
         },
       });
       expect(created.id).toBeGreaterThan(5);
 
       // Cleanup dynamic record
-      await prisma.requesterUser.delete({ where: { id: created.id } });
+      await prisma.user.delete({ where: { id: created.id } });
     });
   });
 });

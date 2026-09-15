@@ -10,26 +10,39 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Requester User (Simulated Development Identity)
+// 1. Role Enum (Strict Single-Role Model per BR-09)
 // ---------------------------------------------------------------------------
-model RequesterUser {
-  id                 Int          @id @default(autoincrement())
-  name               String
-  email              String       @unique
-  department         String?
-  isActive           Boolean      @default(true)
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-
-  // Relational Integrity
-  tickets            Ticket[]     @relation("RequesterTickets")
-  removedAttachments Attachment[] @relation("RequesterRemovedAttachments")
-
-  @@map("requester_users")
+enum Role {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
 }
 
 // ---------------------------------------------------------------------------
-// 2. Related System (Affected Campus IT Services)
+// 2. Production User Model (Evolved from RequesterUser)
+// ---------------------------------------------------------------------------
+model User {
+  id                 Int              @id @default(autoincrement())
+  email              String           @unique
+  passwordHash       String
+  name               String
+  department         String?
+  role               Role             @default(REQUESTER)
+  mustChangePassword Boolean          @default(true)
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  // Relational Integrity
+  requestedTickets   Ticket[]         @relation("RequesterTickets")
+  assignedTickets    Ticket[]         @relation("StaffAssignedTickets")
+  removedAttachments Attachment[]     @relation("UserRemovedAttachments")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// 3. Related System (Affected Campus IT Services)
 // ---------------------------------------------------------------------------
 model RelatedSystem {
   id        Int      @id @default(autoincrement())
@@ -45,7 +58,7 @@ model RelatedSystem {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Category (Problem Classification — Extended from Lab 1)
+// 4. Category (Problem Classification — Extended from Lab 1)
 // ---------------------------------------------------------------------------
 model Category {
   id          Int      @id @default(autoincrement())
@@ -63,12 +76,13 @@ model Category {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Ticket (Service Desk Incident / Request)
+// 5. Ticket (Service Desk Incident / Request)
 // ---------------------------------------------------------------------------
 model Ticket {
   id                Int           @id @default(autoincrement())
   ticketNumber      String        @unique @db.VarChar(32) // Format: TKT-YYYY-NNNNN
   requesterId       Int
+  ownerId           Int?
   categoryId        Int
   relatedSystemId   Int
   summary           String        @db.VarChar(100)
@@ -80,36 +94,38 @@ model Ticket {
   updatedAt         DateTime      @updatedAt
 
   // Relations
-  requester         RequesterUser @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  requester         User          @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  owner             User?         @relation("StaffAssignedTickets", fields: [ownerId], references: [id], onDelete: SetNull)
   category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
   attachments       Attachment[]
 
   @@index([requesterId])
+  @@index([ownerId])
   @@index([currentStatus])
   @@map("tickets")
 }
 
 // ---------------------------------------------------------------------------
-// 5. Attachment (Supporting File Metadata & Soft-Removal Tombstone)
+// 6. Attachment (Supporting File Metadata & Soft-Removal Tombstone)
 // ---------------------------------------------------------------------------
 model Attachment {
-  id                   Int            @id @default(autoincrement())
-  ticketId             Int
-  originalFilename     String
-  storedFilename       String         @unique
-  mimeType             String
-  fileSize             Int            // Size in bytes
-  isRemoved            Boolean        @default(false)
-  removalReason        String?        @db.Text
-  removedAt            DateTime?
-  removedByRequesterId Int?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  id               Int       @id @default(autoincrement())
+  ticketId         Int
+  originalFilename String
+  storedFilename   String    @unique
+  mimeType         String
+  fileSize         Int       // Size in bytes
+  isRemoved        Boolean   @default(false)
+  removalReason    String?   @db.Text
+  removedAt        DateTime?
+  removedByUserId  Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  ticket               Ticket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  removedByRequester   RequesterUser? @relation("RequesterRemovedAttachments", fields: [removedByRequesterId], references: [id], onDelete: SetNull)
+  ticket           Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  removedByUser    User?     @relation("UserRemovedAttachments", fields: [removedByUserId], references: [id], onDelete: SetNull)
 
   @@index([ticketId])
   @@map("attachments")

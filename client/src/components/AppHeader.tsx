@@ -1,14 +1,66 @@
 import React, { useState } from "react";
-import { useRequester } from "../context/RequesterContext.js";
+import { useAuth } from "../context/AuthContext.js";
+import { UserRole } from "../types/index.js";
 
 interface AppHeaderProps {
-  currentTab?: "my-tickets" | "create-ticket";
-  onTabChange?: (tab: "my-tickets" | "create-ticket") => void;
+  currentTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderProps) {
-  const { currentRequester, openSwitchModal } = useRequester();
+  const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Role Badge Styling (DEC-UI-02, DEC-UI-19)
+  const getRoleBadge = (role?: UserRole) => {
+    switch (role) {
+      case "ADMINISTRATOR":
+        return {
+          label: "Administrator",
+          bg: "#FEF3C7",
+          text: "#92400E",
+        };
+      case "IT_STAFF":
+        return {
+          label: "IT Staff",
+          bg: "#EEF2F6",
+          text: "#1E293B",
+        };
+      case "REQUESTER":
+      default:
+        return {
+          label: "Requester",
+          bg: "#EAF6EF",
+          text: "#006B3C",
+        };
+    }
+  };
+
+  const badge = getRoleBadge(user?.role);
+
+  // Role-Based Navigation links (DEC-UI-03)
+  const getNavLinks = (role?: UserRole) => {
+    switch (role) {
+      case "ADMINISTRATOR":
+        return [
+          { id: "user-management", label: "User Management" },
+          { id: "staff-queue", label: "Ticket Queue" },
+        ];
+      case "IT_STAFF":
+        return [
+          { id: "staff-queue", label: "Ticket Queue" },
+          { id: "create-ticket", label: "+ Create Ticket" },
+        ];
+      case "REQUESTER":
+      default:
+        return [
+          { id: "my-tickets", label: "My Tickets" },
+          { id: "create-ticket", label: "+ Create Ticket" },
+        ];
+    }
+  };
+
+  const navLinks = getNavLinks(user?.role);
 
   return (
     <div className="w-100" style={{ zIndex: 1030 }}>
@@ -79,37 +131,28 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           </button>
         </div>
 
-        {/* Center Desktop Nav */}
+        {/* Center Desktop Nav (Role-Based) */}
         <nav className="d-none d-md-flex align-items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-link text-white text-decoration-none px-2 py-1"
-            style={{
-              fontWeight: currentTab === "my-tickets" ? 700 : 400,
-              borderBottom: currentTab === "my-tickets" ? "2px solid #ffffff" : "2px solid transparent",
-              borderRadius: 0,
-            }}
-            onClick={() => onTabChange && onTabChange("my-tickets")}
-          >
-            My Tickets
-          </button>
-          <button
-            type="button"
-            className="btn btn-link text-white text-decoration-none px-2 py-1"
-            style={{
-              fontWeight: currentTab === "create-ticket" ? 700 : 400,
-              borderBottom: currentTab === "create-ticket" ? "2px solid #ffffff" : "2px solid transparent",
-              borderRadius: 0,
-            }}
-            onClick={() => onTabChange && onTabChange("create-ticket")}
-          >
-            + Create Ticket
-          </button>
+          {navLinks.map((link) => (
+            <button
+              key={link.id}
+              type="button"
+              className="btn btn-link text-white text-decoration-none px-2 py-1"
+              style={{
+                fontWeight: currentTab === link.id ? 700 : 400,
+                borderBottom: currentTab === link.id ? "2px solid #ffffff" : "2px solid transparent",
+                borderRadius: 0,
+              }}
+              onClick={() => onTabChange && onTabChange(link.id)}
+            >
+              {link.label}
+            </button>
+          ))}
         </nav>
 
-        {/* Right Persona Badge */}
-        <div className="d-flex align-items-center ms-2">
-          {currentRequester ? (
+        {/* Right Persona Badge & Session Controls (DEC-UI-02) */}
+        <div className="d-flex align-items-center gap-2 ms-2">
+          {user ? (
             <div
               className="d-flex align-items-center px-2 px-sm-3 py-1 rounded-pill"
               style={{
@@ -134,23 +177,41 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
               </svg>
               <span
                 className="small fw-semibold me-2 text-truncate"
-                style={{ maxWidth: "110px" }}
+                style={{ maxWidth: "120px" }}
                 data-testid="active-user-name"
-                title={currentRequester.name}
+                data-tooltip={user.name}
               >
-                {currentRequester.name}
+                {user.name}
               </span>
+
+              {/* Role Badge Pill (DEC-UI-19) */}
+              <span
+                className="badge rounded-pill px-2 py-1 me-2"
+                style={{
+                  backgroundColor: badge.bg,
+                  color: badge.text,
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                }}
+                data-testid="active-user-role"
+              >
+                {badge.label}
+              </span>
+
+              {/* Functional Logout Action */}
               <button
                 type="button"
                 className="btn btn-sm btn-outline-light py-0 px-2 flex-shrink-0"
-                style={{ fontSize: "0.75rem", borderRadius: "12px", minHeight: "28px" }}
-                onClick={openSwitchModal}
+                style={{ fontSize: "0.75rem", borderRadius: "12px", minHeight: "26px" }}
+                onClick={() => logout()}
+                data-testid="logout-button"
+                data-tooltip="Sign out of TokTickIT"
               >
-                Change
+                Logout
               </button>
             </div>
           ) : (
-            <span className="small text-white-50">No requester selected</span>
+            <span className="small text-white-50">Not authenticated</span>
           )}
         </div>
       </header>
@@ -165,34 +226,36 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           }}
           aria-label="Mobile Navigation"
         >
-          <button
-            type="button"
-            className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"
-            style={{
-              fontWeight: currentTab === "my-tickets" ? 700 : 400,
-              minHeight: "44px",
-            }}
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              onTabChange && onTabChange("my-tickets");
-            }}
-          >
-            My Tickets
-          </button>
-          <button
-            type="button"
-            className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"
-            style={{
-              fontWeight: currentTab === "create-ticket" ? 700 : 400,
-              minHeight: "44px",
-            }}
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              onTabChange && onTabChange("create-ticket");
-            }}
-          >
-            + Create Ticket
-          </button>
+          {navLinks.map((link) => (
+            <button
+              key={link.id}
+              type="button"
+              className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"
+              style={{
+                fontWeight: currentTab === link.id ? 700 : 400,
+                minHeight: "44px",
+              }}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onTabChange && onTabChange(link.id);
+              }}
+            >
+              {link.label}
+            </button>
+          ))}
+          {user && (
+            <button
+              type="button"
+              className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center border-top border-white-50 mt-1"
+              style={{ minHeight: "44px" }}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                logout();
+              }}
+            >
+              Sign Out ({user.name})
+            </button>
+          )}
         </nav>
       )}
     </div>
