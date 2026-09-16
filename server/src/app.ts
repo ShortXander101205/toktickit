@@ -7,6 +7,7 @@ import { ticketsRouter } from "./routes/tickets.js";
 import { attachmentsRouter } from "./routes/attachments.js";
 import { authRouter } from "./routes/auth.js";
 import { staffRouter } from "./routes/staff.js";
+import { adminRouter } from "./routes/admin.js";
 import { optionalAuthenticate, requirePasswordChanged } from "./middleware/auth.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
@@ -41,6 +42,12 @@ app.use("/api/auth", authRouter);
 // ---------------------------------------------------------------------------
 app.use("/api/v1/staff", staffRouter);
 app.use("/api/staff", staffRouter);
+
+// ---------------------------------------------------------------------------
+// Lab 3 — Issue 15 Administrator Routes
+// ---------------------------------------------------------------------------
+app.use("/api/v1/admin", adminRouter);
+app.use("/api/admin", adminRouter);
 
 // ---------------------------------------------------------------------------
 // Lab 2 — Feature 2 Reference Data & Requester Routes
