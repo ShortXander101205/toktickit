@@ -86,64 +86,12 @@ export interface Ticket {
   attachments?: Attachment[];
 }
 
-export interface PublicCommentDTO {
-  id: number;
-  ticketId: number;
-  author: {
-    id: number;
-    name: string;
-    role: UserRole;
-  };
-  content: string;
-  createdAt: string;
-}
-
-export interface InternalNoteDTO {
-  id: number;
-  ticketId: number;
-  author: {
-    id: number;
-    name: string;
-    role: UserRole;
-  };
-  content: string;
-  createdAt: string;
-}
-
 export interface TicketDetail extends Ticket {
-  category?: StaffTicketCategoryDTO;
-  relatedSystem?: { id: number; name: string };
   requesterEmail?: string;
-  requester?: StaffTicketRequesterDTO;
-  ownerId?: number | null;
-  owner?: StaffTicketOwnerDTO | null;
   ticketOwner?: string | null;
   resolutionSummary?: string | null;
-  requesterResolutionConfirmedAt?: string | null;
   attachments: Attachment[];
   removedAttachments: Attachment[];
-  publicComments?: PublicCommentDTO[];
-  internalNotes?: InternalNoteDTO[];
-}
-
-export interface AssignOwnerPayload {
-  ownerId: number | null;
-}
-
-export interface UpdatePriorityPayload {
-  itPriority: Priority | string;
-}
-
-export interface TransitionStatusPayload {
-  targetStatus: TicketStatus | string;
-}
-
-export interface CreateCommentPayload {
-  content: string;
-}
-
-export interface CreateNotePayload {
-  content: string;
 }
 
 export interface CreateTicketPayload {
@@ -180,7 +128,6 @@ export interface StaffTicketOwnerDTO {
   id: number;
   name: string;
   email: string;
-  role?: string;
 }
 
 export interface StaffTicketCategoryDTO {

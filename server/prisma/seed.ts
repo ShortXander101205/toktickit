@@ -1132,13 +1132,7 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
       ownerId = idx % 2 === 0 ? (sompongId ?? null) : (wichaiId ?? null);
     }
 
-    // Populate requesterResolutionConfirmedAt for sample ticket (e.g. ticket #5)
-    let requesterResolutionConfirmedAt: Date | null = null;
-    if (idx === 4) {
-      requesterResolutionConfirmedAt = new Date(t.createdAt.getTime() + 3600000);
-    }
-
-    const createdTicket = await prisma.ticket.create({
+    await prisma.ticket.create({
       data: {
         ticketNumber: t.ticketNumber,
         requesterId,
@@ -1150,52 +1144,10 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
         requestedPriority: requestedPri,
         itPriority: itPri,
         currentStatus: ticketStatus,
-        requesterResolutionConfirmedAt,
         createdAt: t.createdAt,
         updatedAt: t.createdAt,
       },
     });
-
-    // Seed Public Comments on sample ticket (idx === 0)
-    if (idx === 0) {
-      await prisma.publicComment.createMany({
-        data: [
-          {
-            ticketId: createdTicket.id,
-            authorId: requesterId,
-            content: "Still experiencing the freeze at 99% when submitting grades.",
-            createdAt: new Date(t.createdAt.getTime() + 1800000),
-          },
-          {
-            ticketId: createdTicket.id,
-            authorId: sompongId ?? requesterId,
-            content: "We have identified a database table deadlock and are deploying an index patch.",
-            createdAt: new Date(t.createdAt.getTime() + 3600000),
-          },
-        ],
-      });
-      // Seed Internal Notes on ticket 1 (Confidential to IT Staff / Admin)
-      if (sompongId) {
-        await prisma.internalNote.create({
-          data: {
-            ticketId: createdTicket.id,
-            authorId: sompongId,
-            content: "Database deadlock detected on table student_grades during exam batch commit. Increasing connection pool.",
-            createdAt: new Date(t.createdAt.getTime() + 2700000),
-          },
-        });
-      }
-    } else if (idx === 1 && sompongId) {
-      await prisma.internalNote.create({
-        data: {
-          ticketId: createdTicket.id,
-          authorId: sompongId,
-          content: "User reported Wi-Fi disconnect in CB2 building 4th floor. AP-04 log indicates authentication timeout.",
-          createdAt: new Date(t.createdAt.getTime() + 1800000),
-        },
-      });
-    }
-
     insertedCount++;
   }
 

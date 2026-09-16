@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { Prisma, Priority, TicketStatus, Role } from "@prisma/client";
+import { Prisma, Priority, TicketStatus } from "@prisma/client";
 import { getPrisma } from "../prisma.js";
 import { uploadAttachments, uploadSingleAttachment } from "../middleware/upload.js";
 import { generateTicketNumber } from "../services/ticketNumber.service.js";
@@ -515,80 +515,53 @@ export async function handleGetTickets(req: Request, res: Response) {
   }
 }
 
-async function resolveUserFromRequest(
-  req: Request,
-  prisma: any
-): Promise<{ user: { id: number; role: Role; name?: string; email?: string } | null; error?: { status: number; code: string; message: string } }> {
-  if (req.user) {
-    return {
-      user: {
-        id: req.user.id,
-        role: req.user.role as Role,
-        name: req.user.name,
-        email: req.user.email,
-      },
-    };
-  }
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return {
-      user: null,
-      error: {
-        status: 400,
-        code: "MISSING_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-      },
-    };
-  }
-  const parsedId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(parsedId)) {
-    return {
-      user: null,
-      error: {
-        status: 400,
-        code: "INVALID_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-      },
-    };
-  }
-  const u = await prisma.user.findUnique({ where: { id: parsedId } });
-  if (!u || !u.isActive) {
-    return {
-      user: null,
-      error: {
-        status: 404,
-        code: "REQUESTER_NOT_FOUND",
-        message: "Requester not found or is inactive.",
-      },
-    };
-  }
-  return {
-    user: {
-      id: u.id,
-      role: u.role as Role,
-      name: u.name,
-      email: u.email,
-    },
-  };
-}
-
 export async function handleGetTicketDetail(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract user identity
-  const authResult = await resolveUserFromRequest(req, prisma);
-  if (!authResult.user) {
-    const err = authResult.error || { status: 401, code: "UNAUTHORIZED", message: "Active authenticated session required." };
-    return res.status(err.status).json({
+  // 1. Verify and extract requester ID
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
+  }
+
+  const requester = await prisma.user.findUnique({
+    where: { id: requesterId },
+  });
+
+  if (!requester || !requester.isActive) {
+    return res.status(404).json({
       success: false,
       error: {
-        code: err.code,
-        message: err.message,
+        code: "REQUESTER_NOT_FOUND",
+        message: "Requester not found or is inactive.",
         details: [],
       },
     });
   }
-  const currentUser = authResult.user;
 
   // 2. Parse and validate ticket ID parameter
   const ticketId = parseInt(req.params.id, 10);
@@ -604,33 +577,14 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
   }
 
   try {
-    const isStaffOrAdmin = currentUser.role === Role.IT_STAFF || currentUser.role === Role.ADMINISTRATOR;
-
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {
         category: true,
         relatedSystem: true,
-        requester: {
-          select: { id: true, name: true, email: true, department: true },
-        },
-        owner: {
-          select: { id: true, name: true, email: true, role: true },
-        },
+        requester: true,
         attachments: {
           include: { removedByUser: true },
-          orderBy: { createdAt: "asc" },
-        },
-        publicComments: {
-          include: {
-            author: { select: { id: true, name: true, role: true } },
-          },
-          orderBy: { createdAt: "asc" },
-        },
-        internalNotes: {
-          include: {
-            author: { select: { id: true, name: true, role: true } },
-          },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -647,8 +601,8 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
       });
     }
 
-    // Requesters are restricted to viewing only their own tickets (BR-04, AC-14.3)
-    if (!isStaffOrAdmin && ticket.requesterId !== currentUser.id) {
+    // Strict Cross-Requester Ownership Check (BR-08, AC-12)
+    if (ticket.requesterId !== requester.id) {
       return res.status(403).json({
         success: false,
         error: {
@@ -689,88 +643,29 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
         updatedAt: a.updatedAt.toISOString(),
       }));
 
-    const formattedPublicComments = ticket.publicComments.map((c) => ({
-      id: c.id,
-      ticketId: c.ticketId,
-      author: {
-        id: c.author.id,
-        name: c.author.name,
-        role: c.author.role,
-      },
-      content: c.content,
-      createdAt: c.createdAt.toISOString(),
-    }));
-
-    const data: Record<string, any> = {
-      id: ticket.id,
-      ticketNumber: ticket.ticketNumber,
-      summary: ticket.summary,
-      description: ticket.description,
-      categoryId: ticket.categoryId,
-      categoryName: ticket.category.name,
-      category: {
-        id: ticket.category.id,
-        name: ticket.category.name,
-        code: ticket.category.code,
-      },
-      relatedSystemId: ticket.relatedSystemId,
-      relatedSystemName: ticket.relatedSystem.name,
-      relatedSystem: {
-        id: ticket.relatedSystem.id,
-        name: ticket.relatedSystem.name,
-      },
-      requestedPriority: formatPriorityToTitle(ticket.requestedPriority),
-      itPriority: formatPriorityToTitle(ticket.itPriority),
-      currentStatus: formatStatusToTitle(ticket.currentStatus),
-      ownerId: ticket.ownerId,
-      owner: ticket.owner
-        ? {
-            id: ticket.owner.id,
-            name: ticket.owner.name,
-            email: ticket.owner.email,
-            role: ticket.owner.role,
-          }
-        : null,
-      ticketOwner: ticket.owner?.name || null,
-      requesterId: ticket.requesterId,
-      requesterName: ticket.requester.name,
-      requesterEmail: ticket.requester.email,
-      requester: {
-        id: ticket.requester.id,
-        name: ticket.requester.name,
-        email: ticket.requester.email,
-        department: ticket.requester.department,
-      },
-      requesterResolutionConfirmedAt: ticket.requesterResolutionConfirmedAt
-        ? ticket.requesterResolutionConfirmedAt.toISOString()
-        : null,
-      createdAt: ticket.createdAt.toISOString(),
-      updatedAt: ticket.updatedAt.toISOString(),
-      attachments: activeAttachments,
-      removedAttachments,
-      publicComments: formattedPublicComments,
-    };
-
-    // STRICT CONFIDENTIALITY INVARIANT (BR-04):
-    // Internal notes are only included for IT Staff and Administrators.
-    // For Requesters, internalNotes is omitted completely from the payload.
-    if (isStaffOrAdmin && ticket.internalNotes) {
-      data.internalNotes = ticket.internalNotes.map((n) => ({
-        id: n.id,
-        ticketId: n.ticketId,
-        author: {
-          id: n.author.id,
-          name: n.author.name,
-          role: n.author.role,
-        },
-        content: n.content,
-        createdAt: n.createdAt.toISOString(),
-      }));
-    }
-
     return res.status(200).json({
       success: true,
-      data,
+      data: {
+        id: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        summary: ticket.summary,
+        description: ticket.description,
+        categoryId: ticket.categoryId,
+        categoryName: ticket.category.name,
+        relatedSystemId: ticket.relatedSystemId,
+        relatedSystemName: ticket.relatedSystem.name,
+        requestedPriority: formatPriorityToTitle(ticket.requestedPriority),
+        itPriority: formatPriorityToTitle(ticket.itPriority),
+        currentStatus: formatStatusToTitle(ticket.currentStatus),
+        ticketOwner: null,
+        requesterId: ticket.requesterId,
+        requesterName: ticket.requester.name,
+        requesterEmail: ticket.requester.email,
+        createdAt: ticket.createdAt.toISOString(),
+        updatedAt: ticket.updatedAt.toISOString(),
+        attachments: activeAttachments,
+        removedAttachments,
+      },
     });
   } catch (error: any) {
     console.error("Error retrieving ticket detail:", error);
@@ -783,234 +678,6 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
       },
     });
   }
-}
-
-/**
- * POST /api/v1/tickets/:id/resolve-request
- * Requester action indicating "Problem Appears Resolved" (BR-05).
- * Updates requesterResolutionConfirmedAt without altering ticket status.
- */
-export async function handleResolveRequest(req: Request, res: Response) {
-  const prisma = getPrisma();
-  const authResult = await resolveUserFromRequest(req, prisma);
-  if (!authResult.user) {
-    const err = authResult.error || { status: 401, code: "UNAUTHORIZED", message: "Active authenticated session required." };
-    return res.status(err.status).json({
-      success: false,
-      error: { code: err.code, message: err.message, details: [] },
-    });
-  }
-  const currentUser = authResult.user;
-
-  const ticketId = parseInt(req.params.id, 10);
-  if (isNaN(ticketId)) {
-    return res.status(400).json({
-      success: false,
-      error: { code: "INVALID_TICKET_ID", message: "Invalid ticket ID." },
-    });
-  }
-
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-  if (!ticket) {
-    return res.status(404).json({
-      success: false,
-      error: { code: "TICKET_NOT_FOUND", message: "Ticket not found." },
-    });
-  }
-
-  // Only the owning requester may indicate resolution
-  if (ticket.requesterId !== currentUser.id) {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: "FORBIDDEN_ACTION",
-        message: "Only the owning requester may record problem resolution confirmation.",
-      },
-    });
-  }
-
-  const now = new Date();
-  const updated = await prisma.ticket.update({
-    where: { id: ticketId },
-    data: { requesterResolutionConfirmedAt: now },
-  });
-
-  return res.status(200).json({
-    success: true,
-    data: {
-      id: updated.id,
-      ticketNumber: updated.ticketNumber,
-      requesterResolutionConfirmedAt: now.toISOString(),
-      message: "Problem resolution indication recorded.",
-    },
-  });
-}
-
-/**
- * POST /api/v1/tickets/:id/comments
- * Post Public Comment (owned Requester, IT Staff, Admin) - BR-04, BR-08.
- */
-export async function handleCreateComment(req: Request, res: Response) {
-  const prisma = getPrisma();
-  const authResult = await resolveUserFromRequest(req, prisma);
-  if (!authResult.user) {
-    const err = authResult.error || { status: 401, code: "UNAUTHORIZED", message: "Active authenticated session required." };
-    return res.status(err.status).json({
-      success: false,
-      error: { code: err.code, message: err.message, details: [] },
-    });
-  }
-  const currentUser = authResult.user;
-
-  const ticketId = parseInt(req.params.id, 10);
-  if (isNaN(ticketId)) {
-    return res.status(400).json({
-      success: false,
-      error: { code: "INVALID_TICKET_ID", message: "Invalid ticket ID." },
-    });
-  }
-
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-  if (!ticket) {
-    return res.status(404).json({
-      success: false,
-      error: { code: "TICKET_NOT_FOUND", message: "Ticket not found." },
-    });
-  }
-
-  // If user is a Requester, verify ticket ownership
-  const isStaffOrAdmin = currentUser.role === Role.IT_STAFF || currentUser.role === Role.ADMINISTRATOR;
-  if (!isStaffOrAdmin && ticket.requesterId !== currentUser.id) {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: "FORBIDDEN_COMMENT",
-        message: "You do not have permission to comment on this ticket.",
-      },
-    });
-  }
-
-  const { content } = req.body || {};
-  const trimmed = typeof content === "string" ? content.trim() : "";
-  if (!trimmed || trimmed.length < 1 || trimmed.length > 2000) {
-    return res.status(422).json({
-      success: false,
-      error: {
-        code: "VALIDATION_FAILED",
-        message: "Comment content must be between 1 and 2000 characters.",
-        fieldErrors: [{ field: "content", message: "Comment content must be between 1 and 2000 characters." }],
-      },
-    });
-  }
-
-  const comment = await prisma.publicComment.create({
-    data: {
-      ticketId: ticket.id,
-      authorId: currentUser.id,
-      content: trimmed,
-    },
-    include: {
-      author: { select: { id: true, name: true, role: true } },
-    },
-  });
-
-  return res.status(201).json({
-    success: true,
-    data: {
-      id: comment.id,
-      ticketId: comment.ticketId,
-      author: {
-        id: comment.author.id,
-        name: comment.author.name,
-        role: comment.author.role,
-      },
-      content: comment.content,
-      createdAt: comment.createdAt.toISOString(),
-    },
-  });
-}
-
-/**
- * POST /api/v1/tickets/:id/notes
- * Post Internal Note (IT Staff and Admin only; 403 Forbidden for Requester) - BR-04, BR-08.
- */
-export async function handleCreateInternalNote(req: Request, res: Response) {
-  const prisma = getPrisma();
-  const authResult = await resolveUserFromRequest(req, prisma);
-  if (!authResult.user) {
-    const err = authResult.error || { status: 401, code: "UNAUTHORIZED", message: "Active authenticated session required." };
-    return res.status(err.status).json({
-      success: false,
-      error: { code: err.code, message: err.message, details: [] },
-    });
-  }
-  const currentUser = authResult.user;
-
-  // Strict Role Guard for Internal Notes (BR-04)
-  if (currentUser.role !== Role.IT_STAFF && currentUser.role !== Role.ADMINISTRATOR) {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: "FORBIDDEN_INTERNAL_NOTES",
-        message: "Access denied. Only IT Staff and Administrators may record internal notes.",
-      },
-    });
-  }
-
-  const ticketId = parseInt(req.params.id, 10);
-  if (isNaN(ticketId)) {
-    return res.status(400).json({
-      success: false,
-      error: { code: "INVALID_TICKET_ID", message: "Invalid ticket ID." },
-    });
-  }
-
-  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-  if (!ticket) {
-    return res.status(404).json({
-      success: false,
-      error: { code: "TICKET_NOT_FOUND", message: "Ticket not found." },
-    });
-  }
-
-  const { content } = req.body || {};
-  const trimmed = typeof content === "string" ? content.trim() : "";
-  if (!trimmed || trimmed.length < 1 || trimmed.length > 2000) {
-    return res.status(422).json({
-      success: false,
-      error: {
-        code: "VALIDATION_FAILED",
-        message: "Note content must be between 1 and 2000 characters.",
-        fieldErrors: [{ field: "content", message: "Note content must be between 1 and 2000 characters." }],
-      },
-    });
-  }
-
-  const note = await prisma.internalNote.create({
-    data: {
-      ticketId: ticket.id,
-      authorId: currentUser.id,
-      content: trimmed,
-    },
-    include: {
-      author: { select: { id: true, name: true, role: true } },
-    },
-  });
-
-  return res.status(201).json({
-    success: true,
-    data: {
-      id: note.id,
-      ticketId: note.ticketId,
-      author: {
-        id: note.author.id,
-        name: note.author.name,
-        role: note.author.role,
-      },
-      content: note.content,
-      createdAt: note.createdAt.toISOString(),
-    },
-  });
 }
 
 export async function handleUploadTicketAttachment(req: Request, res: Response) {
@@ -1200,6 +867,3 @@ ticketsRouter.get("/", handleGetTickets);
 ticketsRouter.post("/", uploadAttachments, handleCreateTicket);
 ticketsRouter.get("/:id", handleGetTicketDetail);
 ticketsRouter.post("/:id/attachments", uploadSingleAttachment, handleUploadTicketAttachment);
-ticketsRouter.post("/:id/resolve-request", handleResolveRequest);
-ticketsRouter.post("/:id/comments", handleCreateComment);
-ticketsRouter.post("/:id/notes", handleCreateInternalNote);
