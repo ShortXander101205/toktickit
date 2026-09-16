@@ -10,6 +10,9 @@ import {
   TicketDetail,
   Attachment,
   CreateTicketPayload,
+  StaffQueueQueryParams,
+  StaffQueueResponseDTO,
+  StaffTicketSummaryDTO,
 } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -470,3 +473,53 @@ export async function removeAttachment(
 
   return json;
 }
+
+// Issue 13: IT Staff Ticket Queue API
+export async function getStaffTicketsApi(
+  params?: StaffQueueQueryParams
+): Promise<StaffQueueResponseDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.status) query.set("status", params.status);
+  if (params?.category) query.set("category", params.category);
+  if (params?.priority) query.set("priority", params.priority);
+  if (params?.owner) query.set("owner", params.owner);
+  if (params?.sortBy) query.set("sortBy", params.sortBy);
+  if (params?.sortOrder) query.set("sortOrder", params.sortOrder);
+  if (params?.page !== undefined) query.set("page", String(params.page));
+  if (params?.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
+
+  const qs = query.toString();
+  const url = `${API_URL}/api/v1/staff/tickets${qs ? `?${qs}` : ""}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<StaffQueueResponseDTO> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to retrieve staff ticket queue: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+

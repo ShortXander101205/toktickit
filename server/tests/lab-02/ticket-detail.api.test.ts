@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Priority, TicketStatus } from "@prisma/client";
 import app from "../../src/app.js";
 import { seed } from "../../prisma/seed.js";
 
@@ -32,9 +32,9 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
         relatedSystemId: sysLaptop!.id,
         summary: "Laptop battery drains quickly",
         description: "My laptop battery is draining much faster than usual even when idle.",
-        requestedPriority: "High",
-        itPriority: "High",
-        currentStatus: "New",
+        requestedPriority: Priority.HIGH,
+        itPriority: Priority.HIGH,
+        currentStatus: TicketStatus.NEW,
       },
     });
 
@@ -74,9 +74,9 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
         relatedSystemId: sysLaptop!.id,
         summary: "Monitor flickering issue",
         description: "External monitor flickers constantly when plugged into dock.",
-        requestedPriority: "Medium",
-        itPriority: "Medium",
-        currentStatus: "New",
+        requestedPriority: Priority.MEDIUM,
+        itPriority: Priority.MEDIUM,
+        currentStatus: TicketStatus.NEW,
       },
     });
   });

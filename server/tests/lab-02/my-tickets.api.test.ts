@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Priority, TicketStatus } from "@prisma/client";
 import app from "../../src/app.js";
 import { seed } from "../../prisma/seed.js";
 
@@ -18,6 +18,7 @@ describe("API: GET /api/tickets (Feature 8 My Tickets - AC-04-01, AC-04-03)", ()
     await prisma.attachment.deleteMany();
     await prisma.ticket.deleteMany();
     await seed(prisma);
+    await prisma.user.updateMany({ where: { id: 5 }, data: { isActive: false } });
 
     // 2. Fetch categories and systems for test fixtures
     catAccount = await prisma.category.findUnique({ where: { code: "ACC" } });
@@ -37,9 +38,9 @@ describe("API: GET /api/tickets (Feature 8 My Tickets - AC-04-01, AC-04-03)", ()
         relatedSystemId: sysWifi!.id,
         summary: "Campus Wi-Fi drops intermittently",
         description: "Wi-Fi connection terminates every 15 minutes in Library area.",
-        requestedPriority: "High",
-        itPriority: "High",
-        currentStatus: "New",
+        requestedPriority: Priority.HIGH,
+        itPriority: Priority.HIGH,
+        currentStatus: TicketStatus.NEW,
         createdAt: new Date("2026-09-01T10:00:00Z"),
       },
     });
@@ -53,9 +54,9 @@ describe("API: GET /api/tickets (Feature 8 My Tickets - AC-04-01, AC-04-03)", ()
         relatedSystemId: sysEmail!.id,
         summary: "Laptop battery drains quickly",
         description: "Hardware battery issue that requires replacement diagnosis.",
-        requestedPriority: "Medium",
+        requestedPriority: Priority.MEDIUM,
         itPriority: null, // Unassigned IT priority
-        currentStatus: "In Progress",
+        currentStatus: TicketStatus.IN_PROGRESS,
         createdAt: new Date("2026-09-02T11:00:00Z"),
       },
     });
@@ -69,9 +70,9 @@ describe("API: GET /api/tickets (Feature 8 My Tickets - AC-04-01, AC-04-03)", ()
         relatedSystemId: sysEmail!.id,
         summary: "Password reset assistance needed",
         description: "User locked out after exceeding failed attempts limit.",
-        requestedPriority: "Low",
-        itPriority: "Low",
-        currentStatus: "Resolved",
+        requestedPriority: Priority.LOW,
+        itPriority: Priority.LOW,
+        currentStatus: TicketStatus.RESOLVED,
         createdAt: new Date("2026-09-03T12:00:00Z"),
       },
     });
@@ -86,9 +87,9 @@ describe("API: GET /api/tickets (Feature 8 My Tickets - AC-04-01, AC-04-03)", ()
         relatedSystemId: sysEmail!.id,
         summary: "Department printer jammed and offline",
         description: "Printer in CB2 room 301 is not responding.",
-        requestedPriority: "Urgent",
-        itPriority: "Urgent",
-        currentStatus: "New",
+        requestedPriority: Priority.URGENT,
+        itPriority: Priority.URGENT,
+        currentStatus: TicketStatus.NEW,
         createdAt: new Date("2026-09-04T08:00:00Z"),
       },
     });
@@ -102,9 +103,9 @@ describe("API: GET /api/tickets (Feature 8 My Tickets - AC-04-01, AC-04-03)", ()
         relatedSystemId: sysWifi!.id,
         summary: "Cannot establish VPN session from home",
         description: "SSL VPN authentication fails with error 403.",
-        requestedPriority: "Medium",
-        itPriority: "Medium",
-        currentStatus: "New",
+        requestedPriority: Priority.MEDIUM,
+        itPriority: Priority.MEDIUM,
+        currentStatus: TicketStatus.NEW,
         createdAt: new Date("2026-09-04T09:00:00Z"),
       },
     });

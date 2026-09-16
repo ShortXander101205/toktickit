@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
 import { AppHeader } from "./components/AppHeader.js";
@@ -10,21 +10,31 @@ import { checkSystem, Category } from "./api.js";
 import { CreateTicket } from "./components/CreateTicket.js";
 import { MyTickets } from "./components/MyTickets.js";
 import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
+import { StaffTicketQueue } from "./components/StaffTicketQueue.js";
 
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
   const { user } = useAuth();
   const { currentRequester, isSwitchModalOpen, closeSwitchModal } = useRequester();
-  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket">("my-tickets");
+  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket" | "ticket-queue">("my-tickets");
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+
+  // Default to ticket queue for IT Staff and Administrator
+  useEffect(() => {
+    if (user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") {
+      setActiveTab("ticket-queue");
+    } else {
+      setActiveTab("my-tickets");
+    }
+  }, [user?.role]);
 
   // System status checker (preserved from Lab 1)
   const [sysState, setSysState] = useState<SystemCheckState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
 
   // Reset selected ticket detail when tab switches
-  function handleTabChange(tab: "my-tickets" | "create-ticket") {
+  function handleTabChange(tab: "my-tickets" | "create-ticket" | "ticket-queue") {
     setSelectedTicketId(null);
     setActiveTab(tab);
   }
@@ -66,15 +76,19 @@ function MainApp() {
                 ticketId={selectedTicketId}
                 onBack={() => setSelectedTicketId(null)}
               />
+            ) : activeTab === "ticket-queue" ? (
+              <StaffTicketQueue
+                onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}
+              />
             ) : activeTab === "create-ticket" ? (
               <CreateTicket
                 onSuccess={() => {
                   setSelectedTicketId(null);
-                  setActiveTab("my-tickets");
+                  setActiveTab(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? "ticket-queue" : "my-tickets");
                 }}
                 onCancel={() => {
                   setSelectedTicketId(null);
-                  setActiveTab("my-tickets");
+                  setActiveTab(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? "ticket-queue" : "my-tickets");
                 }}
               />
             ) : (

@@ -3,8 +3,8 @@ import { RequesterContext } from "../context/RequesterContext.js";
 import { AuthContext } from "../context/AuthContext.js";
 
 interface AppHeaderProps {
-  currentTab?: "my-tickets" | "create-ticket";
-  onTabChange?: (tab: "my-tickets" | "create-ticket") => void;
+  currentTab?: "my-tickets" | "create-ticket" | "ticket-queue";
+  onTabChange?: (tab: "my-tickets" | "create-ticket" | "ticket-queue") => void;
 }
 
 export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderProps) {
@@ -139,6 +139,21 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
         {/* Center Desktop Nav */}
         <nav className="d-none d-md-flex align-items-center gap-3">
+          {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
+            <button
+              type="button"
+              className="btn btn-link text-white text-decoration-none px-2 py-1"
+              data-testid="nav-ticket-queue"
+              style={{
+                fontWeight: currentTab === "ticket-queue" ? 700 : 400,
+                borderBottom: currentTab === "ticket-queue" ? "2px solid #ffffff" : "2px solid transparent",
+                borderRadius: 0,
+              }}
+              onClick={() => onTabChange && onTabChange("ticket-queue")}
+            >
+              Ticket Queue
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-link text-white text-decoration-none px-2 py-1"
@@ -265,6 +280,23 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           }}
           aria-label="Mobile Navigation"
         >
+          {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
+            <button
+              type="button"
+              className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"
+              data-testid="nav-ticket-queue-mobile"
+              style={{
+                fontWeight: currentTab === "ticket-queue" ? 700 : 400,
+                minHeight: "44px",
+              }}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onTabChange && onTabChange("ticket-queue");
+              }}
+            >
+              Ticket Queue
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"

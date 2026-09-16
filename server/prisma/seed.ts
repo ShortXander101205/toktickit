@@ -1,6 +1,29 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, Role, Priority, TicketStatus } from "@prisma/client";
 import bcryptjs from "bcryptjs";
 import { getPrisma } from "../src/prisma.js";
+
+function mapPriority(p: string | null | undefined): Priority {
+  if (!p) return Priority.MEDIUM;
+  const upper = p.toUpperCase();
+  if (upper === "LOW") return Priority.LOW;
+  if (upper === "MEDIUM") return Priority.MEDIUM;
+  if (upper === "HIGH") return Priority.HIGH;
+  if (upper === "URGENT") return Priority.URGENT;
+  return Priority.MEDIUM;
+}
+
+function mapStatus(s: string): TicketStatus {
+  const norm = s.toUpperCase().replace(/\s+/g, "_");
+  if (norm === "NEW") return TicketStatus.NEW;
+  if (norm === "OPEN" || norm === "ASSIGNED") return TicketStatus.OPEN;
+  if (norm === "IN_PROGRESS") return TicketStatus.IN_PROGRESS;
+  if (norm === "WAITING_FOR_REQUESTER" || norm === "PENDING_REQUESTER") return TicketStatus.WAITING_FOR_REQUESTER;
+  if (norm === "RESOLVED") return TicketStatus.RESOLVED;
+  if (norm === "CLOSED") return TicketStatus.CLOSED;
+  if (norm === "REOPENED") return TicketStatus.REOPENED;
+  if (norm === "CANCELLED") return TicketStatus.CANCELLED;
+  return TicketStatus.NEW;
+}
 
 export const CATEGORIES_SEED = [
   {
@@ -1022,7 +1045,11 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
 
   // 3. Insert demo tickets
   let insertedCount = 0;
-  for (const t of DEMO_TICKETS_SEED) {
+  const sompongId = userMap.get("sompong.it@kmutt.ac.th");
+  const wichaiId = userMap.get("wichai.sup@kmutt.ac.th");
+
+  for (let idx = 0; idx < DEMO_TICKETS_SEED.length; idx++) {
+    const t = DEMO_TICKETS_SEED[idx];
     const requesterId = userMap.get(t.userEmail.toLowerCase());
     const categoryId = catMap.get(t.categoryCode);
     const relatedSystemId = sysMap.get(t.systemName);
@@ -1034,17 +1061,31 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
       continue;
     }
 
+    const requestedPri = mapPriority(t.requestedPriority);
+    const itPri = t.itPriority ? mapPriority(t.itPriority) : requestedPri;
+    const ticketStatus = mapStatus(t.currentStatus);
+
+    // Assign realistic staff owners:
+    // - Status NEW is always unassigned
+    // - Every 4th ticket is unassigned
+    // - Otherwise alternate between Sompong IT and Wichai Support
+    let ownerId: number | null = null;
+    if (ticketStatus !== TicketStatus.NEW && idx % 4 !== 0) {
+      ownerId = idx % 2 === 0 ? (sompongId ?? null) : (wichaiId ?? null);
+    }
+
     await prisma.ticket.create({
       data: {
         ticketNumber: t.ticketNumber,
         requesterId,
+        ownerId,
         categoryId,
         relatedSystemId,
         summary: t.summary,
         description: t.description,
-        requestedPriority: t.requestedPriority,
-        itPriority: t.itPriority,
-        currentStatus: t.currentStatus,
+        requestedPriority: requestedPri,
+        itPriority: itPri,
+        currentStatus: ticketStatus,
         createdAt: t.createdAt,
         updatedAt: t.createdAt,
       },

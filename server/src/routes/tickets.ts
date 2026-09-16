@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { Prisma } from "@prisma/client";
+import { Prisma, Priority, TicketStatus } from "@prisma/client";
 import { getPrisma } from "../prisma.js";
 import { uploadAttachments, uploadSingleAttachment } from "../middleware/upload.js";
 import { generateTicketNumber } from "../services/ticketNumber.service.js";
@@ -9,6 +9,52 @@ import { validateAttachmentFile, validateAttachmentQuantity } from "../services/
 export const ticketsRouter = Router();
 
 const VALID_PRIORITIES = new Set(["Low", "Medium", "High", "Urgent"]);
+
+function parsePriorityEnum(val: string): Priority {
+  const upper = val.trim().toUpperCase();
+  if (upper === "LOW") return Priority.LOW;
+  if (upper === "MEDIUM") return Priority.MEDIUM;
+  if (upper === "HIGH") return Priority.HIGH;
+  if (upper === "URGENT") return Priority.URGENT;
+  return Priority.MEDIUM;
+}
+
+function parseTicketStatusEnum(val: string): TicketStatus {
+  const norm = val.trim().toUpperCase().replace(/\s+/g, "_");
+  if (norm === "NEW") return TicketStatus.NEW;
+  if (norm === "OPEN" || norm === "ASSIGNED") return TicketStatus.OPEN;
+  if (norm === "IN_PROGRESS") return TicketStatus.IN_PROGRESS;
+  if (norm === "WAITING_FOR_REQUESTER" || norm === "PENDING_REQUESTER") return TicketStatus.WAITING_FOR_REQUESTER;
+  if (norm === "RESOLVED") return TicketStatus.RESOLVED;
+  if (norm === "CLOSED") return TicketStatus.CLOSED;
+  if (norm === "REOPENED") return TicketStatus.REOPENED;
+  if (norm === "CANCELLED") return TicketStatus.CANCELLED;
+  return TicketStatus.NEW;
+}
+
+export function formatPriorityToTitle(val: Priority | string | null | undefined): string | null {
+  if (val === null || val === undefined) return null;
+  const upper = val.toString().trim().toUpperCase();
+  if (upper === "LOW") return "Low";
+  if (upper === "MEDIUM") return "Medium";
+  if (upper === "HIGH") return "High";
+  if (upper === "URGENT") return "Urgent";
+  return val.toString();
+}
+
+export function formatStatusToTitle(val: TicketStatus | string | null | undefined): string {
+  if (!val) return "New";
+  const norm = val.toString().trim().toUpperCase().replace(/\s+/g, "_");
+  if (norm === "NEW") return "New";
+  if (norm === "OPEN" || norm === "ASSIGNED") return "Open";
+  if (norm === "IN_PROGRESS") return "In Progress";
+  if (norm === "WAITING_FOR_REQUESTER" || norm === "PENDING_REQUESTER") return "Waiting for Requester";
+  if (norm === "RESOLVED") return "Resolved";
+  if (norm === "CLOSED") return "Closed";
+  if (norm === "REOPENED") return "Reopened";
+  if (norm === "CANCELLED") return "Cancelled";
+  return val.toString();
+}
 
 export async function handleCreateTicket(req: Request, res: Response) {
   const prisma = getPrisma();
@@ -195,9 +241,9 @@ export async function handleCreateTicket(req: Request, res: Response) {
           relatedSystemId: relatedSystem!.id,
           summary: trimmedSummary,
           description: trimmedDescription,
-          requestedPriority: normalizedPriority,
-          itPriority: normalizedPriority, // Auto-matches requestedPriority upon creation
-          currentStatus: "New",
+          requestedPriority: parsePriorityEnum(normalizedPriority),
+          itPriority: parsePriorityEnum(normalizedPriority), // Auto-matches requestedPriority upon creation
+          currentStatus: TicketStatus.NEW,
         },
         include: {
           category: true,
@@ -237,9 +283,9 @@ export async function handleCreateTicket(req: Request, res: Response) {
         categoryName: ticket.category.name,
         relatedSystemId: ticket.relatedSystemId,
         relatedSystemName: ticket.relatedSystem.name,
-        requestedPriority: ticket.requestedPriority,
-        itPriority: ticket.itPriority,
-        currentStatus: ticket.currentStatus,
+        requestedPriority: formatPriorityToTitle(ticket.requestedPriority),
+        itPriority: formatPriorityToTitle(ticket.itPriority),
+        currentStatus: formatStatusToTitle(ticket.currentStatus),
         requesterId: ticket.requesterId,
         requesterName: ticket.requester.name,
         createdAt: ticket.createdAt.toISOString(),
@@ -350,7 +396,7 @@ export async function handleGetTickets(req: Request, res: Response) {
       itPriorityCondition = { itPriority: null };
     } else {
       const normalizedIt = trimmedIt.charAt(0).toUpperCase() + trimmedIt.slice(1).toLowerCase();
-      itPriorityCondition = { itPriority: normalizedIt };
+      itPriorityCondition = { itPriority: parsePriorityEnum(normalizedIt) };
     }
   }
 
@@ -395,9 +441,9 @@ export async function handleGetTickets(req: Request, res: Response) {
   const where: Prisma.TicketWhereInput = {
     requesterId: requester.id, // INVARIANT: Strict requester isolation (BR-08)
     ...(parsedCategoryId !== undefined ? { categoryId: parsedCategoryId } : {}),
-    ...(normalizedReqPriority ? { requestedPriority: normalizedReqPriority } : {}),
+    ...(normalizedReqPriority ? { requestedPriority: parsePriorityEnum(normalizedReqPriority) } : {}),
     ...(itPriorityCondition ? itPriorityCondition : {}),
-    ...(statusFilter ? { currentStatus: statusFilter } : {}),
+    ...(statusFilter ? { currentStatus: parseTicketStatusEnum(statusFilter) } : {}),
     ...(searchKeyword
       ? {
           OR: [
@@ -436,9 +482,9 @@ export async function handleGetTickets(req: Request, res: Response) {
       categoryName: t.category.name,
       relatedSystemId: t.relatedSystemId,
       relatedSystemName: t.relatedSystem.name,
-      requestedPriority: t.requestedPriority,
-      itPriority: t.itPriority,
-      currentStatus: t.currentStatus,
+      requestedPriority: formatPriorityToTitle(t.requestedPriority),
+      itPriority: formatPriorityToTitle(t.itPriority),
+      currentStatus: formatStatusToTitle(t.currentStatus),
       requesterId: t.requesterId,
       ticketOwner: null,
       createdAt: t.createdAt.toISOString(),
@@ -608,9 +654,9 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
         categoryName: ticket.category.name,
         relatedSystemId: ticket.relatedSystemId,
         relatedSystemName: ticket.relatedSystem.name,
-        requestedPriority: ticket.requestedPriority,
-        itPriority: ticket.itPriority,
-        currentStatus: ticket.currentStatus,
+        requestedPriority: formatPriorityToTitle(ticket.requestedPriority),
+        itPriority: formatPriorityToTitle(ticket.itPriority),
+        currentStatus: formatStatusToTitle(ticket.currentStatus),
         ticketOwner: null,
         requesterId: ticket.requesterId,
         requesterName: ticket.requester.name,

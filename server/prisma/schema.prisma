@@ -19,6 +19,30 @@ enum Role {
 }
 
 // ---------------------------------------------------------------------------
+// Priority Enum (Standard 4-Tier Severity Scale)
+// ---------------------------------------------------------------------------
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ---------------------------------------------------------------------------
+// Ticket Status Enum (Full 8-State Service Desk Lifecycle)
+// ---------------------------------------------------------------------------
+enum TicketStatus {
+  NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_REQUESTER
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
 // 1. User Model (Unified Production Identity - Issue 12)
 // ---------------------------------------------------------------------------
 model User {
@@ -35,6 +59,7 @@ model User {
 
   // Relationships
   requestedTickets   Ticket[]     @relation("RequesterTickets")
+  assignedTickets    Ticket[]     @relation("StaffAssignedTickets")
   removedAttachments Attachment[] @relation("UserRemovedAttachments")
 
   @@map("users")
@@ -81,24 +106,31 @@ model Ticket {
   id                Int           @id @default(autoincrement())
   ticketNumber      String        @unique @db.VarChar(32) // Format: TKT-YYYY-NNNNN
   requesterId       Int
+  ownerId           Int?
   categoryId        Int
   relatedSystemId   Int
   summary           String        @db.VarChar(100)
   description       String        @db.Text
-  requestedPriority String        // Low, Medium, High, Urgent
-  itPriority        String?       // Low, Medium, High, Urgent
-  currentStatus     String        @default("New") // New, Assigned, In Progress, Pending Requester, Resolved, Closed, Cancelled
+  requestedPriority Priority      @default(MEDIUM)
+  itPriority        Priority?
+  currentStatus     TicketStatus  @default(NEW)
+  requesterResolvedAt DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   // Relations
   requester         User          @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  owner             User?         @relation("StaffAssignedTickets", fields: [ownerId], references: [id], onDelete: SetNull)
   category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
   attachments       Attachment[]
 
   @@index([requesterId])
+  @@index([ownerId])
   @@index([currentStatus])
+  @@index([itPriority])
+  @@index([categoryId])
+  @@index([createdAt])
   @@map("tickets")
 }
 
