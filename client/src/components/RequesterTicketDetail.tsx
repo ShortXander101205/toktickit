@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { TicketDetail, Attachment } from "../types/index.js";
+import { TicketDetail, Attachment, PublicCommentDTO } from "../types/index.js";
 import { useRequester } from "../context/RequesterContext.js";
-import { fetchTicketDetail } from "../api.js";
+import { fetchTicketDetail, postPublicCommentApi, resolveTicketRequestApi } from "../api.js";
 import { AttachmentSection } from "./AttachmentSection.js";
 
 interface RequesterTicketDetailProps {
@@ -156,6 +156,28 @@ function renderPriorityBadge(priority?: string | null) {
   );
 }
 
+function renderCommentRoleBadge(role: string) {
+  if (role === "IT_STAFF") {
+    return (
+      <span className="badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2 py-0.5" style={{ fontSize: "0.75rem" }}>
+        IT Staff
+      </span>
+    );
+  }
+  if (role === "ADMINISTRATOR") {
+    return (
+      <span className="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5" style={{ fontSize: "0.75rem" }}>
+        Admin
+      </span>
+    );
+  }
+  return (
+    <span className="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-0.5" style={{ fontSize: "0.75rem" }}>
+      Requester
+    </span>
+  );
+}
+
 export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetailProps) {
   const { currentRequester } = useRequester();
 
@@ -163,6 +185,14 @@ export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetai
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Issue 14: Public Comments and Problem Appears Resolved states
+  const [newComment, setNewComment] = useState("");
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolutionSuccessMessage, setResolutionSuccessMessage] = useState<string | null>(null);
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -324,6 +354,53 @@ export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetai
     });
   }
 
+  // Handler for Requester indicating problem appears resolved (BR-05)
+  async function handleResolveProblem() {
+    if (!ticket) return;
+    setIsResolving(true);
+    setResolutionError(null);
+    try {
+      const res = await resolveTicketRequestApi(ticket.id, currentRequester?.id);
+      const confirmedAt = res?.requesterResolutionConfirmedAt || new Date().toISOString();
+      setTicket((prev) => (prev ? { ...prev, requesterResolutionConfirmedAt: confirmedAt } : null));
+      setResolutionSuccessMessage("Problem resolution indication successfully recorded.");
+    } catch (err: any) {
+      setResolutionError(err.message || "Failed to record resolution indication.");
+    } finally {
+      setIsResolving(false);
+    }
+  }
+
+  // Handler for posting a public comment (BR-04, BR-08)
+  async function handlePostComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ticket) return;
+    const trimmed = newComment.trim();
+    if (!trimmed) return;
+    if (trimmed.length > 2000) {
+      setCommentError("Comment cannot exceed 2000 characters.");
+      return;
+    }
+
+    setIsPostingComment(true);
+    setCommentError(null);
+    try {
+      const created = await postPublicCommentApi(ticket.id, trimmed, currentRequester?.id);
+      setTicket((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          publicComments: [...(prev.publicComments || []), created],
+        };
+      });
+      setNewComment("");
+    } catch (err: any) {
+      setCommentError(err.message || "Failed to post comment.");
+    } finally {
+      setIsPostingComment(false);
+    }
+  }
+
   return (
     <div className="ticket-detail-view pb-5">
       {/* Top Action Bar */}
@@ -338,6 +415,65 @@ export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetai
         </button>
         <div>{renderStatusBadge(ticket.currentStatus)}</div>
       </div>
+
+      {/* Requester Resolution Status / Action Banner (BR-05) */}
+      {ticket.publicComments !== undefined && (
+        ticket.requesterResolutionConfirmedAt ? (
+          <div
+            className="alert d-flex align-items-center gap-2 mb-3 py-2.5 px-3"
+            style={{
+              borderRadius: "8px",
+              border: "1px solid #A7F3D0",
+              backgroundColor: "#ECFDF5",
+              color: "#065F46",
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <div className="small">
+              <strong>Problem Appears Resolved:</strong> You indicated resolution on{" "}
+              {formatDate(ticket.requesterResolutionConfirmedAt)}. IT Staff will review and finalize the ticket.
+            </div>
+          </div>
+        ) : (
+          !["RESOLVED", "CLOSED", "CANCELLED"].includes(ticket.currentStatus.toUpperCase()) && (
+            <div
+              className="card border-0 shadow-sm p-3 mb-3 d-flex flex-row justify-content-between align-items-center flex-wrap gap-2"
+              style={{ borderRadius: "8px", backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0" }}
+            >
+              <div>
+                <div className="fw-semibold text-success small">Is your issue resolved?</div>
+                <div className="text-muted" style={{ fontSize: "0.75rem" }}>
+                  Click if the problem is fixed from your perspective. IT Staff will be notified.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-success fw-semibold d-inline-flex align-items-center gap-1.5 px-3"
+                onClick={handleResolveProblem}
+                disabled={isResolving}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                {isResolving ? "Saving..." : "Problem Appears Resolved"}
+              </button>
+            </div>
+          )
+        )
+      )}
+      {resolutionSuccessMessage && (
+        <div className="alert alert-success small py-2 px-3 mb-3">
+          {resolutionSuccessMessage}
+        </div>
+      )}
+      {resolutionError && (
+        <div className="alert alert-danger small py-2 px-3 mb-3">
+          {resolutionError}
+        </div>
+      )}
 
       {/* Read-Only Ticket Header & Details Card */}
       <div
@@ -443,6 +579,96 @@ export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetai
         onAttachmentAdded={handleAttachmentAdded}
         onAttachmentRemoved={handleAttachmentRemoved}
       />
+
+      {/* Public Comments Discussion Section */}
+      {ticket.publicComments !== undefined && (
+        <div
+          className="card border-0 shadow-sm p-4 mt-4"
+          style={{ borderRadius: "8px", backgroundColor: "var(--color-surface-card)" }}
+        >
+          <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+            <div>
+              <h3 className="h6 fw-bold mb-0" style={{ color: "var(--color-text-primary)" }}>
+                Public Comments ({ticket.publicComments?.length || 0})
+              </h3>
+              <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+                Visible to you, IT Staff, and Administrators
+              </span>
+            </div>
+          </div>
+
+          {/* Comment List */}
+          <div className="comment-list mb-4 d-flex flex-column gap-3">
+            {(!ticket.publicComments || ticket.publicComments.length === 0) ? (
+              <div className="text-muted text-center py-4 small" style={{ backgroundColor: "#F9FAFB", borderRadius: "6px" }}>
+                No public comments yet. Use the form below to post an update or question.
+              </div>
+            ) : (
+              ticket.publicComments.map((comment) => (
+                <div
+                  key={comment.id}
+                  className="p-3 rounded-2"
+                  style={{
+                    backgroundColor: "#F9FAFB",
+                    border: "1px solid #E5E7EB",
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="fw-semibold text-dark small">{comment.author.name}</span>
+                      {renderCommentRoleBadge(comment.author.role)}
+                    </div>
+                    <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+                      {formatDate(comment.createdAt)}
+                    </span>
+                  </div>
+                  <div
+                    className="text-dark small"
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5 }}
+                  >
+                    {comment.content}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Post Comment Form */}
+          <form onSubmit={handlePostComment} className="comment-composer">
+            <label htmlFor="requester-comment-input" className="form-label fw-semibold small mb-1">
+              Add a Public Comment
+            </label>
+            <textarea
+              id="requester-comment-input"
+              className="form-control mb-1"
+              rows={3}
+              maxLength={2000}
+              placeholder="Type your comment or question here..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              disabled={isPostingComment}
+              style={{ fontSize: "0.875rem" }}
+            />
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+                {newComment.length} / 2000 characters
+              </span>
+              {commentError && (
+                <span className="text-danger small">{commentError}</span>
+              )}
+            </div>
+            <div className="d-flex justify-content-end">
+              <button
+                type="submit"
+                className="btn btn-primary-green btn-sm fw-semibold px-3"
+                disabled={isPostingComment || !newComment.trim() || newComment.length > 2000}
+              >
+                {isPostingComment ? "Posting..." : "Post Comment"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
