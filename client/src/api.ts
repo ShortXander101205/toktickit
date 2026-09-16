@@ -13,6 +13,9 @@ import {
   StaffQueueQueryParams,
   StaffQueueResponseDTO,
   StaffTicketSummaryDTO,
+  StaffTicketOwnerDTO,
+  PublicCommentDTO,
+  InternalNoteDTO,
 } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -522,4 +525,311 @@ export async function getStaffTicketsApi(
 
   return json.data;
 }
+
+// Issue 14: IT Staff Ticket Detail & Operational Controls API
+export async function getTicketDetailApi(
+  ticketId: number,
+  activeRequesterId?: number
+): Promise<TicketDetail> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (activeRequesterId) {
+    headers["x-requester-id"] = String(activeRequesterId);
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/tickets/${ticketId}`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<TicketDetail> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch ticket detail: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function getStaffAssigneesApi(): Promise<StaffTicketOwnerDTO[]> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/staff/assignees`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<StaffTicketOwnerDTO[]> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to retrieve assignees: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function assignTicketOwnerApi(
+  ticketId: number,
+  ownerId: number | null
+): Promise<any> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/staff/tickets/${ticketId}/assignment`, {
+    method: "PATCH",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({ ownerId }),
+  });
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to update ticket assignment: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function updateTicketPriorityApi(
+  ticketId: number,
+  itPriority: string
+): Promise<any> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/staff/tickets/${ticketId}/priority`, {
+    method: "PATCH",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({ itPriority }),
+  });
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to update IT priority: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function transitionTicketStatusApi(
+  ticketId: number,
+  targetStatus: string
+): Promise<any> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/staff/tickets/${ticketId}/status`, {
+    method: "PATCH",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({ targetStatus }),
+  });
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to transition ticket status: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function resolveTicketRequestApi(
+  ticketId: number,
+  requesterId?: number
+): Promise<any> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (requesterId) {
+    headers["x-requester-id"] = String(requesterId);
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/tickets/${ticketId}/resolve-request`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({}),
+  });
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to record resolution indication: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function postPublicCommentApi(
+  ticketId: number,
+  content: string,
+  requesterId?: number
+): Promise<PublicCommentDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (requesterId) {
+    headers["x-requester-id"] = String(requesterId);
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/tickets/${ticketId}/comments`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({ content }),
+  });
+
+  const json: ApiResponse<PublicCommentDTO> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to post public comment: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function postInternalNoteApi(
+  ticketId: number,
+  content: string
+): Promise<InternalNoteDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/tickets/${ticketId}/notes`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify({ content }),
+  });
+
+  const json: ApiResponse<InternalNoteDTO> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to post internal note: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
 

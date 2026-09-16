@@ -58,9 +58,11 @@ model User {
   updatedAt          DateTime     @updatedAt
 
   // Relationships
-  requestedTickets   Ticket[]     @relation("RequesterTickets")
-  assignedTickets    Ticket[]     @relation("StaffAssignedTickets")
-  removedAttachments Attachment[] @relation("UserRemovedAttachments")
+  requestedTickets   Ticket[]        @relation("RequesterTickets")
+  assignedTickets    Ticket[]        @relation("StaffAssignedTickets")
+  removedAttachments Attachment[]    @relation("UserRemovedAttachments")
+  publicComments     PublicComment[]
+  internalNotes      InternalNote[]
 
   @@map("users")
 }
@@ -111,18 +113,21 @@ model Ticket {
   relatedSystemId   Int
   summary           String        @db.VarChar(100)
   description       String        @db.Text
-  requestedPriority Priority      @default(MEDIUM)
-  itPriority        Priority?
-  currentStatus     TicketStatus  @default(NEW)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  requestedPriority              Priority        @default(MEDIUM)
+  itPriority                     Priority?
+  currentStatus                  TicketStatus    @default(NEW)
+  requesterResolutionConfirmedAt DateTime?
+  createdAt                      DateTime        @default(now())
+  updatedAt                      DateTime        @updatedAt
 
   // Relations
-  requester         User          @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
-  owner             User?         @relation("StaffAssignedTickets", fields: [ownerId], references: [id], onDelete: SetNull)
-  category          Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  relatedSystem     RelatedSystem @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  requester         User            @relation("RequesterTickets", fields: [requesterId], references: [id], onDelete: Restrict)
+  owner             User?           @relation("StaffAssignedTickets", fields: [ownerId], references: [id], onDelete: SetNull)
+  category          Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem     RelatedSystem   @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
   attachments       Attachment[]
+  publicComments    PublicComment[]
+  internalNotes     InternalNote[]
 
   @@index([requesterId])
   @@index([ownerId])
@@ -166,4 +171,40 @@ model TicketNumberSequence {
   nextVal Int @default(1)
 
   @@map("ticket_number_sequences")
+}
+
+// ---------------------------------------------------------------------------
+// 7. Public Comment (Shared Thread — Requester, IT Staff, Admin - BR-04, BR-08)
+// ---------------------------------------------------------------------------
+model PublicComment {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  authorId  Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@map("public_comments")
+}
+
+// ---------------------------------------------------------------------------
+// 8. Internal Note (Confidential Thread — IT Staff, Admin Only - BR-04, BR-08)
+// ---------------------------------------------------------------------------
+model InternalNote {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  authorId  Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@map("internal_notes")
 }
