@@ -10,6 +10,7 @@ import { checkSystem, Category } from "./api.js";
 import { CreateTicket } from "./components/CreateTicket.js";
 import { MyTickets } from "./components/MyTickets.js";
 import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
+import { StaffTicketDetail } from "./components/StaffTicketDetail.js";
 import { StaffTicketQueue } from "./components/StaffTicketQueue.js";
 
 type SystemCheckState = "idle" | "loading" | "success" | "error";
@@ -72,10 +73,17 @@ function MainApp() {
         ) : (
           <div>
             {selectedTicketId !== null ? (
-              <RequesterTicketDetail
-                ticketId={selectedTicketId}
-                onBack={() => setSelectedTicketId(null)}
-              />
+              user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? (
+                <StaffTicketDetail
+                  ticketId={selectedTicketId}
+                  onBack={() => setSelectedTicketId(null)}
+                />
+              ) : (
+                <RequesterTicketDetail
+                  ticketId={selectedTicketId}
+                  onBack={() => setSelectedTicketId(null)}
+                />
+              )
             ) : activeTab === "ticket-queue" ? (
               <StaffTicketQueue
                 onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}
