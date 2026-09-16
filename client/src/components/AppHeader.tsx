@@ -3,8 +3,8 @@ import { RequesterContext } from "../context/RequesterContext.js";
 import { AuthContext } from "../context/AuthContext.js";
 
 interface AppHeaderProps {
-  currentTab?: "my-tickets" | "create-ticket" | "ticket-queue";
-  onTabChange?: (tab: "my-tickets" | "create-ticket" | "ticket-queue") => void;
+  currentTab?: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users";
+  onTabChange?: (tab: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users") => void;
 }
 
 export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderProps) {
@@ -110,6 +110,21 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
         {/* Center Desktop Nav (>= 768px) */}
         <nav className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
+          {activeUser?.role === "ADMINISTRATOR" && (
+            <button
+              type="button"
+              className="btn btn-link text-white text-decoration-none px-2 py-1"
+              data-testid="nav-user-management"
+              style={{
+                fontWeight: currentTab === "admin-users" ? 700 : 400,
+                borderBottom: currentTab === "admin-users" ? "2px solid #ffffff" : "2px solid transparent",
+                borderRadius: 0,
+              }}
+              onClick={() => onTabChange && onTabChange("admin-users")}
+            >
+              User Management
+            </button>
+          )}
           {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
             <button
               type="button"
@@ -380,6 +395,24 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
           {/* Navigation Links with accessible min 44px height */}
           <div className="d-flex flex-column gap-1">
+            {activeUser?.role === "ADMINISTRATOR" && (
+              <button
+                type="button"
+                className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                data-testid="nav-user-management-mobile"
+                style={{
+                  fontWeight: currentTab === "admin-users" ? 700 : 400,
+                  minHeight: "44px",
+                  backgroundColor: currentTab === "admin-users" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                }}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onTabChange && onTabChange("admin-users");
+                }}
+              >
+                User Management
+              </button>
+            )}
             {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
               <button
                 type="button"

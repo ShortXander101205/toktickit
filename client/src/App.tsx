@@ -12,13 +12,14 @@ import { MyTickets } from "./components/MyTickets.js";
 import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
 import { StaffTicketDetail } from "./components/StaffTicketDetail.js";
 import { StaffTicketQueue } from "./components/StaffTicketQueue.js";
+import { UserManagement } from "./components/UserManagement.js";
 
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
   const { user } = useAuth();
   const { currentRequester, isSwitchModalOpen, closeSwitchModal } = useRequester();
-  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket" | "ticket-queue">("my-tickets");
+  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket" | "ticket-queue" | "admin-users">("my-tickets");
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
 
   // Default to ticket queue for IT Staff and Administrator
@@ -35,7 +36,7 @@ function MainApp() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   // Reset selected ticket detail when tab switches
-  function handleTabChange(tab: "my-tickets" | "create-ticket" | "ticket-queue") {
+  function handleTabChange(tab: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users") {
     setSelectedTicketId(null);
     setActiveTab(tab);
   }
@@ -84,6 +85,8 @@ function MainApp() {
                   onBack={() => setSelectedTicketId(null)}
                 />
               )
+            ) : activeTab === "admin-users" && user?.role === "ADMINISTRATOR" ? (
+              <UserManagement />
             ) : activeTab === "ticket-queue" ? (
               <StaffTicketQueue
                 onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}

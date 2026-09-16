@@ -16,6 +16,10 @@ import {
   StaffTicketOwnerDTO,
   PublicCommentDTO,
   InternalNoteDTO,
+  AdminUserDTO,
+  CreateAdminUserPayload,
+  UpdateAdminUserPayload,
+  ResetUserPasswordPayload,
 } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -831,5 +835,172 @@ export async function postInternalNoteApi(
 
   return json.data;
 }
+
+// ---------------------------------------------------------------------------
+// Administrator User Management API methods (Issue 15)
+// ---------------------------------------------------------------------------
+
+export async function fetchAdminUsersApi(params?: {
+  search?: string;
+  role?: string;
+}): Promise<AdminUserDTO[]> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const searchParams = new URLSearchParams();
+  if (params?.search) {
+    searchParams.set("search", params.search);
+  }
+  if (params?.role) {
+    searchParams.set("role", params.role);
+  }
+
+  const queryString = searchParams.toString();
+  const url = `${API_URL}/api/v1/admin/users${queryString ? `?${queryString}` : ""}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<AdminUserDTO[]> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch users: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function createAdminUserApi(
+  payload: CreateAdminUserPayload
+): Promise<AdminUserDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/admin/users`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<AdminUserDTO> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to create user: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function updateAdminUserApi(
+  id: number,
+  payload: UpdateAdminUserPayload
+): Promise<AdminUserDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/admin/users/${id}`, {
+    method: "PATCH",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<AdminUserDTO> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to update user: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function resetUserPasswordApi(
+  id: number,
+  payload: ResetUserPasswordPayload
+): Promise<{ message: string; mustChangePassword: boolean; userId: number }> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/admin/users/${id}/reset-password`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<{ message: string; mustChangePassword: boolean; userId: number }> =
+    await res.json().catch(() => ({
+      success: false,
+      error: {
+        code: "PARSE_ERROR",
+        message: `Failed to parse response: HTTP ${res.status}`,
+      },
+    } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to reset password: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
 
 

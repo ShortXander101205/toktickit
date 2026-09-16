@@ -235,3 +235,37 @@ export interface StaffQueueQueryParams {
   pageSize?: number;
 }
 
+export interface AdminUserDTO {
+  id: number;
+  name: string;
+  email: string;
+  department?: string | null;
+  role: UserRole;
+  isActive: boolean;
+  mustChangePassword?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateAdminUserPayload {
+  name: string;
+  email: string;
+  department?: string;
+  role: UserRole;
+  isActive?: boolean;
+  initialPassword: string;
+}
+
+export interface UpdateAdminUserPayload {
+  name?: string;
+  email?: string;
+  department?: string;
+  role?: UserRole;
+  isActive?: boolean;
+}
+
+export interface ResetUserPasswordPayload {
+  newInitialPassword: string;
+}
+
+
