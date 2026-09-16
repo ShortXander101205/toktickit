@@ -144,3 +144,36 @@ export function deriveRequesterIdentity(req: Request, _res: Response, next: Next
   }
   next();
 }
+
+/**
+ * Middleware enforcing RBAC (BR-06): verifies user has one of the allowed roles.
+ * Returns 401 Unauthorized if unauthenticated, or 403 Forbidden if role not permitted.
+ */
+export function requireRole(allowedRoles: Array<"REQUESTER" | "IT_STAFF" | "ADMINISTRATOR">) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required.",
+        },
+      });
+      return;
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Access denied. IT Staff or Administrator role required.",
+        },
+      });
+      return;
+    }
+
+    next();
+  };
+}
+

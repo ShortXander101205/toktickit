@@ -111,3 +111,74 @@ export interface ApiResponse<T> {
     details?: Array<{ field?: string; message: string }>;
   };
 }
+
+export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type TicketStatus =
+  | "NEW"
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_REQUESTER"
+  | "RESOLVED"
+  | "CLOSED"
+  | "REOPENED"
+  | "CANCELLED";
+
+export interface StaffTicketOwnerDTO {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface StaffTicketCategoryDTO {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface StaffTicketRequesterDTO {
+  id: number;
+  name: string;
+  email: string;
+  department?: string | null;
+}
+
+export interface StaffTicketSummaryDTO {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  category: StaffTicketCategoryDTO;
+  requestedPriority: Priority | string;
+  itPriority: Priority | string | null;
+  currentStatus: TicketStatus | string;
+  requester: StaffTicketRequesterDTO;
+  owner: StaffTicketOwnerDTO | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StaffQueuePaginationDTO {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface StaffQueueResponseDTO {
+  items: StaffTicketSummaryDTO[];
+  pagination: StaffQueuePaginationDTO;
+  totalCount: number;
+}
+
+export interface StaffQueueQueryParams {
+  search?: string;
+  status?: string;
+  category?: string;
+  priority?: string;
+  owner?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+}
+

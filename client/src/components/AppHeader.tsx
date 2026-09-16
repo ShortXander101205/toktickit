@@ -3,8 +3,8 @@ import { RequesterContext } from "../context/RequesterContext.js";
 import { AuthContext } from "../context/AuthContext.js";
 
 interface AppHeaderProps {
-  currentTab?: "my-tickets" | "create-ticket";
-  onTabChange?: (tab: "my-tickets" | "create-ticket") => void;
+  currentTab?: "my-tickets" | "create-ticket" | "ticket-queue";
+  onTabChange?: (tab: "my-tickets" | "create-ticket" | "ticket-queue") => void;
 }
 
 export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderProps) {
@@ -16,12 +16,13 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
   const activeUser = auth?.user;
 
-  function renderRoleBadge(role: string) {
+  function renderRoleBadge(role: string, isMobile = false) {
+    const testId = isMobile ? "user-role-badge-mobile" : "user-role-badge";
     if (role === "IT_STAFF") {
       return (
         <span
           className="badge rounded-pill ms-2"
-          data-testid="user-role-badge"
+          data-testid={testId}
           style={{
             backgroundColor: "#e0f2fe",
             color: "#0369a1",
@@ -38,7 +39,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
       return (
         <span
           className="badge rounded-pill ms-2"
-          data-testid="user-role-badge"
+          data-testid={testId}
           style={{
             backgroundColor: "#fef3c7",
             color: "#b45309",
@@ -54,7 +55,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
     return (
       <span
         className="badge rounded-pill ms-2"
-        data-testid="user-role-badge"
+        data-testid={testId}
         style={{
           backgroundColor: "#eaf6ef",
           color: "#006b3c",
@@ -76,9 +77,10 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           backgroundColor: "var(--color-primary-green)",
           minHeight: "56px",
           color: "#ffffff",
+          overflowX: "clip",
         }}
       >
-        {/* Brand & Mobile Hamburger */}
+        {/* Brand (Left) */}
         <div className="d-flex align-items-center gap-2 flex-shrink-0">
           <svg
             width="24"
@@ -94,7 +96,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           </svg>
           <span className="fw-bold fs-5 tracking-tight">TokTickIT</span>
           <span
-            className="badge ms-1 d-none d-sm-inline-block"
+            className="badge ms-1 d-none d-lg-inline-block"
             style={{
               backgroundColor: "rgba(255, 255, 255, 0.2)",
               color: "#ffffff",
@@ -104,41 +106,25 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           >
             IT Service Desk
           </span>
-
-          {/* Accessible Mobile Hamburger Toggle (DEC-UI-10) */}
-          <button
-            type="button"
-            className="navbar-toggler d-inline-flex d-md-none btn btn-link text-white p-1 ms-1"
-            aria-expanded={isMobileMenuOpen}
-            aria-label="Toggle navigation"
-            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            style={{
-              minWidth: "44px",
-              minHeight: "44px",
-              alignItems: "center",
-              justifyContent: "center",
-              textDecoration: "none",
-            }}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              {isMobileMenuOpen ? (
-                <>
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </>
-              ) : (
-                <>
-                  <line x1="3" y1="12" x2="21" y2="12"></line>
-                  <line x1="3" y1="6" x2="21" y2="6"></line>
-                  <line x1="3" y1="18" x2="21" y2="18"></line>
-                </>
-              )}
-            </svg>
-          </button>
         </div>
 
-        {/* Center Desktop Nav */}
-        <nav className="d-none d-md-flex align-items-center gap-3">
+        {/* Center Desktop Nav (>= 768px) */}
+        <nav className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
+          {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
+            <button
+              type="button"
+              className="btn btn-link text-white text-decoration-none px-2 py-1"
+              data-testid="nav-ticket-queue"
+              style={{
+                fontWeight: currentTab === "ticket-queue" ? 700 : 400,
+                borderBottom: currentTab === "ticket-queue" ? "2px solid #ffffff" : "2px solid transparent",
+                borderRadius: 0,
+              }}
+              onClick={() => onTabChange && onTabChange("ticket-queue")}
+            >
+              Ticket Queue
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-link text-white text-decoration-none px-2 py-1"
@@ -165,15 +151,14 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           </button>
         </nav>
 
-        {/* Right Persona & Auth Badge */}
-        <div className="d-flex align-items-center ms-2">
+        {/* Right Desktop Persona & Auth Badge (>= 768px) */}
+        <div className="d-none d-md-flex align-items-center ms-2 flex-shrink-0">
           {activeUser ? (
             <div
-              className="d-flex align-items-center px-2 px-sm-3 py-1 rounded-pill"
+              className="d-flex align-items-center px-3 py-1 rounded-pill"
               style={{
                 backgroundColor: "rgba(255, 255, 255, 0.15)",
                 border: "1px solid rgba(255, 255, 255, 0.25)",
-                maxWidth: "100%",
               }}
             >
               <svg
@@ -185,14 +170,14 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="me-1 me-sm-2 flex-shrink-0"
+                className="me-2 flex-shrink-0"
               >
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               <span
-                className="small fw-semibold me-1 text-truncate"
-                style={{ maxWidth: "120px" }}
+                className="small fw-semibold text-truncate"
+                style={{ maxWidth: "130px" }}
                 data-testid="active-user-name"
                 title={activeUser.name}
               >
@@ -204,18 +189,17 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
                 className="btn btn-sm btn-outline-light ms-2 py-0 px-2 flex-shrink-0"
                 style={{ fontSize: "0.75rem", borderRadius: "12px", minHeight: "28px" }}
                 data-testid="logout-button"
-                onClick={auth.logout}
+                onClick={auth?.logout}
               >
                 Log out
               </button>
             </div>
           ) : currentRequester ? (
             <div
-              className="d-flex align-items-center px-2 px-sm-3 py-1 rounded-pill"
+              className="d-flex align-items-center px-3 py-1 rounded-pill"
               style={{
                 backgroundColor: "rgba(255, 255, 255, 0.15)",
                 border: "1px solid rgba(255, 255, 255, 0.25)",
-                maxWidth: "100%",
               }}
             >
               <svg
@@ -227,14 +211,14 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="me-1 me-sm-2 flex-shrink-0"
+                className="me-2 flex-shrink-0"
               >
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               <span
                 className="small fw-semibold me-2 text-truncate"
-                style={{ maxWidth: "110px" }}
+                style={{ maxWidth: "120px" }}
                 data-testid="active-user-name"
                 title={currentRequester.name}
               >
@@ -253,46 +237,198 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
             <span className="small text-white-50">Not authenticated</span>
           )}
         </div>
+
+        {/* Right Mobile Hamburger Toggle (< 768px) */}
+        <div className="d-flex d-md-none align-items-center">
+          <button
+            type="button"
+            className="navbar-toggler btn btn-link text-white p-0 d-flex align-items-center justify-content-center"
+            aria-expanded={isMobileMenuOpen}
+            aria-label="Toggle navigation"
+            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+            style={{
+              width: "44px",
+              height: "44px",
+              minWidth: "44px",
+              minHeight: "44px",
+              textDecoration: "none",
+              borderRadius: "8px",
+              backgroundColor: isMobileMenuOpen ? "rgba(255, 255, 255, 0.15)" : "transparent",
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              {isMobileMenuOpen ? (
+                <>
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </>
+              ) : (
+                <>
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </>
+              )}
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Mobile Drawer (DEC-UI-10) */}
       {isMobileMenuOpen && (
         <nav
-          className="d-flex d-md-none flex-column px-3 py-2"
+          className="d-flex d-md-none flex-column px-3 py-3"
           style={{
             backgroundColor: "var(--color-secondary-green)",
             borderTop: "1px solid rgba(255, 255, 255, 0.2)",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
           }}
           aria-label="Mobile Navigation"
         >
-          <button
-            type="button"
-            className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"
-            style={{
-              fontWeight: currentTab === "my-tickets" ? 700 : 400,
-              minHeight: "44px",
-            }}
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              onTabChange && onTabChange("my-tickets");
-            }}
-          >
-            My Tickets
-          </button>
-          <button
-            type="button"
-            className="btn btn-link text-white text-start text-decoration-none py-2 px-1 d-flex align-items-center"
-            style={{
-              fontWeight: currentTab === "create-ticket" ? 700 : 400,
-              minHeight: "44px",
-            }}
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              onTabChange && onTabChange("create-ticket");
-            }}
-          >
-            + Create Ticket
-          </button>
+          {/* Mobile User Profile & Logout Section */}
+          {activeUser ? (
+            <div
+              className="d-flex align-items-center justify-content-between p-2 mb-3 rounded"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.12)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <div className="d-flex align-items-center min-w-0 me-2">
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                  style={{ width: "36px", height: "36px", backgroundColor: "rgba(255, 255, 255, 0.2)" }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <div className="d-flex flex-column min-w-0">
+                  <span
+                    className="fw-semibold text-white small text-truncate"
+                    title={activeUser.name}
+                    data-testid="active-user-name-mobile"
+                  >
+                    {activeUser.name}
+                  </span>
+                  <div className="mt-1">
+                    {renderRoleBadge(activeUser.role, true)}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-light flex-shrink-0 px-3 py-1"
+                style={{ minHeight: "36px", fontSize: "0.8rem", borderRadius: "8px", fontWeight: 500 }}
+                data-testid="logout-button-mobile"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  auth?.logout();
+                }}
+              >
+                Log out
+              </button>
+            </div>
+          ) : currentRequester ? (
+            <div
+              className="d-flex align-items-center justify-content-between p-2 mb-3 rounded"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.12)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+              }}
+            >
+              <div className="d-flex align-items-center min-w-0 me-2">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="me-2 flex-shrink-0"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span className="fw-semibold text-white small text-truncate">
+                  {currentRequester.name}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-light flex-shrink-0 px-3 py-1"
+                style={{ minHeight: "36px", fontSize: "0.8rem", borderRadius: "8px" }}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  openSwitchModal && openSwitchModal();
+                }}
+              >
+                Change
+              </button>
+            </div>
+          ) : null}
+
+          {/* Navigation Links with accessible min 44px height */}
+          <div className="d-flex flex-column gap-1">
+            {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
+              <button
+                type="button"
+                className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                data-testid="nav-ticket-queue-mobile"
+                style={{
+                  fontWeight: currentTab === "ticket-queue" ? 700 : 400,
+                  minHeight: "44px",
+                  backgroundColor: currentTab === "ticket-queue" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                }}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onTabChange && onTabChange("ticket-queue");
+                }}
+              >
+                Ticket Queue
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+              style={{
+                fontWeight: currentTab === "my-tickets" ? 700 : 400,
+                minHeight: "44px",
+                backgroundColor: currentTab === "my-tickets" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+              }}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onTabChange && onTabChange("my-tickets");
+              }}
+            >
+              My Tickets
+            </button>
+            <button
+              type="button"
+              className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+              style={{
+                fontWeight: currentTab === "create-ticket" ? 700 : 400,
+                minHeight: "44px",
+                backgroundColor: currentTab === "create-ticket" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+              }}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                onTabChange && onTabChange("create-ticket");
+              }}
+            >
+              + Create Ticket
+            </button>
+          </div>
         </nav>
       )}
     </div>

@@ -6,6 +6,7 @@ import { referenceRouter, getCategories, getRelatedSystems } from "./routes/refe
 import { ticketsRouter } from "./routes/tickets.js";
 import { attachmentsRouter } from "./routes/attachments.js";
 import { authRouter } from "./routes/auth.js";
+import { staffRouter } from "./routes/staff.js";
 import { optionalAuthenticate, requirePasswordChanged } from "./middleware/auth.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
@@ -34,6 +35,12 @@ app.get("/api/health", (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 app.use("/api/v1/auth", authRouter);
 app.use("/api/auth", authRouter);
+
+// ---------------------------------------------------------------------------
+// Lab 3 — Issue 13 IT Staff Routes
+// ---------------------------------------------------------------------------
+app.use("/api/v1/staff", staffRouter);
+app.use("/api/staff", staffRouter);
 
 // ---------------------------------------------------------------------------
 // Lab 2 — Feature 2 Reference Data & Requester Routes
