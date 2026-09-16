@@ -63,8 +63,9 @@ export const RELATED_SYSTEMS_SEED = [
 ];
 
 export const USERS_SEED = [
-  // 1. Requesters (4 active, 1 inactive, 1 testing)
+  // 1. Requesters (4 active, 1 inactive)
   {
+    id: 1,
     name: "Jennifer Anderson",
     email: "jennifer.anderson@kmutt.ac.th",
     department: "Engineering",
@@ -73,6 +74,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 2,
     name: "Michael Brown",
     email: "michael.brown@kmutt.ac.th",
     department: "Science",
@@ -81,6 +83,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 3,
     name: "David Lee",
     email: "david.lee@kmutt.ac.th",
     department: "Architecture",
@@ -89,6 +92,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 4,
     name: "Sarah Johnson",
     email: "sarah.johnson@kmutt.ac.th",
     department: "Science",
@@ -97,6 +101,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 5,
     name: "Prasert Inactive",
     email: "inactive.user@kmutt.ac.th",
     department: "Liberal Arts",
@@ -104,17 +109,10 @@ export const USERS_SEED = [
     mustChangePassword: true,
     isActive: false,
   },
-  {
-    name: "Test Active Requester",
-    email: "test.requester@kmutt.ac.th",
-    department: "Testing Pool",
-    role: Role.REQUESTER,
-    mustChangePassword: false,
-    isActive: true,
-  },
 
   // 2. IT Staff (3 active, 1 inactive)
   {
+    id: 6,
     name: "Sompong IT",
     email: "sompong.it@kmutt.ac.th",
     department: "Central IT",
@@ -123,6 +121,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 7,
     name: "Wichai Support",
     email: "wichai.sup@kmutt.ac.th",
     department: "Helpdesk Tier 1",
@@ -131,6 +130,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 8,
     name: "Anong Network",
     email: "anong.net@kmutt.ac.th",
     department: "Network Operations",
@@ -139,6 +139,7 @@ export const USERS_SEED = [
     isActive: true,
   },
   {
+    id: 9,
     name: "Kanya Retired",
     email: "kanya.ret@kmutt.ac.th",
     department: "Legacy Systems",
@@ -149,11 +150,23 @@ export const USERS_SEED = [
 
   // 3. Administrator (1 active)
   {
+    id: 10,
     name: "System Administrator",
     email: "admin@kmutt.ac.th",
     department: "IT Administration",
     role: Role.ADMINISTRATOR,
     mustChangePassword: true,
+    isActive: true,
+  },
+
+  // 4. Testing Pool Requester (1 active, mustChangePassword: false)
+  {
+    id: 11,
+    name: "Test Active Requester",
+    email: "test.requester@kmutt.ac.th",
+    department: "Testing Pool",
+    role: Role.REQUESTER,
+    mustChangePassword: false,
     isActive: true,
   },
 ];
@@ -189,28 +202,73 @@ export async function seed(prisma: PrismaClient): Promise<void> {
     });
   }
 
-  // 3. Seed Users (Keyed on lowercase unique email)
+  // 3. Seed Users (Keyed on lowercase unique email with deterministic IDs 1-11)
   const defaultPasswordHash = bcryptjs.hashSync("Password123!", 10);
   for (const user of USERS_SEED) {
-    await prisma.user.upsert({
+    const existingByEmail = await prisma.user.findUnique({
       where: { email: user.email.toLowerCase() },
-      update: {
-        name: user.name,
-        department: user.department,
-        role: user.role,
-        mustChangePassword: user.mustChangePassword,
-        isActive: user.isActive,
-      },
-      create: {
-        name: user.name,
-        email: user.email.toLowerCase(),
-        department: user.department,
-        role: user.role,
-        mustChangePassword: user.mustChangePassword,
-        isActive: user.isActive,
-        passwordHash: defaultPasswordHash,
-      },
     });
+    const existingById = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (existingByEmail && existingByEmail.id === user.id) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          name: user.name,
+          department: user.department,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+          isActive: user.isActive,
+        },
+      });
+    } else if (existingByEmail && existingByEmail.id !== user.id) {
+      if (existingById && existingById.email.toLowerCase() !== user.email.toLowerCase()) {
+        const tempId = existingById.id + 10000;
+        await prisma.$executeRawUnsafe(`UPDATE tickets SET "requesterId" = ${tempId} WHERE "requesterId" = ${existingById.id};`);
+        await prisma.$executeRawUnsafe(`UPDATE tickets SET "ownerId" = ${tempId} WHERE "ownerId" = ${existingById.id};`);
+        await prisma.$executeRawUnsafe(`UPDATE attachments SET "removedByUserId" = ${tempId} WHERE "removedByUserId" = ${existingById.id};`);
+        await prisma.$executeRawUnsafe(`UPDATE users SET id = ${tempId} WHERE id = ${existingById.id};`);
+      }
+      await prisma.$executeRawUnsafe(`UPDATE tickets SET "requesterId" = ${user.id} WHERE "requesterId" = ${existingByEmail.id};`);
+      await prisma.$executeRawUnsafe(`UPDATE tickets SET "ownerId" = ${user.id} WHERE "ownerId" = ${existingByEmail.id};`);
+      await prisma.$executeRawUnsafe(`UPDATE attachments SET "removedByUserId" = ${user.id} WHERE "removedByUserId" = ${existingByEmail.id};`);
+      await prisma.$executeRawUnsafe(
+        `UPDATE users SET id = ${user.id}, name = $1, department = $2, role = $3::"Role", "mustChangePassword" = $4, "isActive" = $5 WHERE id = ${existingByEmail.id};`,
+        user.name,
+        user.department,
+        user.role,
+        user.mustChangePassword,
+        user.isActive
+      );
+    } else if (!existingByEmail && existingById) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          email: user.email.toLowerCase(),
+          name: user.name,
+          department: user.department,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+          isActive: user.isActive,
+          passwordHash: defaultPasswordHash,
+        },
+      });
+    } else {
+      await prisma.user.create({
+        data: {
+          id: user.id,
+          name: user.name,
+          email: user.email.toLowerCase(),
+          department: user.department,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+          isActive: user.isActive,
+          passwordHash: defaultPasswordHash,
+        },
+      });
+    }
   }
 
   // 4. Synchronize PostgreSQL autoincrement sequences

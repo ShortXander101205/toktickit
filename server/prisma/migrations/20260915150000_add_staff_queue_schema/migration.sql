@@ -31,6 +31,19 @@ ALTER TABLE "tickets"
 
 ALTER TABLE "tickets" ALTER COLUMN "requestedPriority" SET DEFAULT 'MEDIUM'::"Priority";
 
+-- Convert itPriority to Priority enum safely
+ALTER TABLE "tickets" 
+  ALTER COLUMN "itPriority" TYPE "Priority" 
+  USING (
+    CASE UPPER("itPriority")
+      WHEN 'LOW' THEN 'LOW'::"Priority"
+      WHEN 'MEDIUM' THEN 'MEDIUM'::"Priority"
+      WHEN 'HIGH' THEN 'HIGH'::"Priority"
+      WHEN 'URGENT' THEN 'URGENT'::"Priority"
+      ELSE NULL
+    END
+  );
+
 -- Populate itPriority = requestedPriority for existing tickets (BR-07)
 UPDATE "tickets" SET "itPriority" = "requestedPriority" WHERE "itPriority" IS NULL;
 
