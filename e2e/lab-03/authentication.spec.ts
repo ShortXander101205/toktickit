@@ -1,13 +1,8 @@
 import { test, expect } from "@playwright/test";
-import path from "path";
-import { SCREENSHOTS_ROOT, ensureDir, captureScreenshot, TEST_USERS } from "../helpers.js";
+import { captureScreenshot, TEST_USERS } from "../helpers";
 
 test.describe("Sprint 3 — Authentication, Password Rotation & App Shell (E2E-01)", () => {
   test.setTimeout(90000);
-
-  test.beforeAll(() => {
-    ensureDir(path.join(SCREENSHOTS_ROOT, "authentication"));
-  });
 
   test("E2E-01.1: Valid login, App Shell header verification, responsive viewports & zero overflow", async ({ page }) => {
     // 1. Navigate to root -> Login page

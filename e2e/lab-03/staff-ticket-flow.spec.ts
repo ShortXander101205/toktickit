@@ -1,6 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import path from "path";
-import { SCREENSHOTS_ROOT, ensureDir, captureScreenshot, TEST_USERS } from "../helpers.js";
+import { captureScreenshot, TEST_USERS } from "../helpers";
 
 async function loginStaff(page: Page) {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -34,11 +33,6 @@ async function loginStaff(page: Page) {
 
 test.describe("Sprint 3 — IT Staff Ticket Queue, Detail & Confidentiality (E2E-02)", () => {
   test.setTimeout(120000);
-
-  test.beforeAll(() => {
-    ensureDir(path.join(SCREENSHOTS_ROOT, "staff-queue"));
-    ensureDir(path.join(SCREENSHOTS_ROOT, "staff-ticket-detail"));
-  });
 
   test("E2E-02.1: Staff Queue, Search, Filter, Sort, Viewports & Detail Operations", async ({ page }) => {
     // -------------------------------------------------------------------------

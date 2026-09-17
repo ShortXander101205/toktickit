@@ -1,6 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import path from "path";
-import { SCREENSHOTS_ROOT, ensureDir, captureScreenshot, TEST_USERS } from "../helpers.js";
+import { captureScreenshot, TEST_USERS } from "../helpers";
 
 async function loginAdmin(page: Page) {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -34,10 +33,6 @@ async function loginAdmin(page: Page) {
 
 test.describe("Sprint 3 — Administrator User Management & Safety Invariants (E2E-03)", () => {
   test.setTimeout(120000);
-
-  test.beforeAll(() => {
-    ensureDir(path.join(SCREENSHOTS_ROOT, "user-management"));
-  });
 
   test("E2E-03.1: Admin Roster, Viewports, Create, Edit, Safety Blocks (BR-11/12), and Password Reset", async ({ page }) => {
     // -------------------------------------------------------------------------
