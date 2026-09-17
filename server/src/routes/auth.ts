@@ -218,6 +218,14 @@ authRouter.post(
       success: true,
       data: {
         message: "Password updated successfully.",
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          department: user.department,
+          role: user.role,
+          mustChangePassword: false,
+        },
       },
     });
   }
