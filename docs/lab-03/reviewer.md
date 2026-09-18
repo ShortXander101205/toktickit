@@ -21,28 +21,30 @@
 ### Reviewer Comments Received & Author Responses
 
 #### Issue 11: Sprint 3 Engineering Contract & Software Test Planning
-- **Reviewer Comment:** Engineering contract files under `docs/features/11-spec-and-tests/` and test specifications in `docs/lab-03/tests.md` are very thorough and fully align with `Lab_03_labsheet.pdf` and SDS v1.0. Seed data in `prisma/seed.ts` seeds 11 accounts and 64 tickets with deterministic IDs. Please make sure the password validation rules in `tests.md` explicitly list all 6 complexity checks.
-- **Author Response:** Updated `tests.md` to itemize all 6 password complexity rules (min 8 chars, uppercase, lowercase, digit, special character, and confirmation match). Thanks for catching that!
+- **Reviewer Comment:** All authoritative Sprint 3 engineering contract documents and directory scaffolding have been authored and verified against `Lab_03_labsheet.pdf`, `TokTickIT-System-Level-SDS-v1.0.docx`, and our project scope.
+- **Author Response:** Thank you for the helpful review.
 
 #### Issue 12: Authentication Foundation, User Migration & Application Shell Navigation
-- **Reviewer Comment:** Authentication endpoints (`/login`, `/logout`, `/me`, `/change-password`), cookie-based sessions, and the responsive AppHeader look great. Tested invalid credentials and inactive accounts—both safely return 401 without leaking account existence. The mandatory password change view correctly intercepts users with `mustChangePassword: true` and blocks normal workspace tabs. All 21 Vitest tests pass. Approved!
-- **Author Response:** Thank you for testing the anti-enumeration defense and forced password rotation intercept!
+- **Reviewer Comment:** I tried running manually testing this on my computer, but found out that some parts were missing, such as the error messages not displaying once the incorrect passwords were inputted. npm tests on the server would fail with error 400 or similar. I believed this isn't a me problem, as I have correctly reset my database and seeded your data.
+  
+  Reviewing this code for a second time, Prisma schema migration, server auth endpoints, frontend components, and automated test logs for Issue 12 are verified and all implementation requirements are satisfied. All my manual tests have passed. I saw the login screen, the new password screen, the requester role, and the correct UX.
+- **Author Response:** Thanks for running those manual tests and catching those issues earlier. I updated the implementation and test coverage to make sure everything aligned with the requirements. Thank you for the multiple reviews.
 
 #### Issue 13: IT Staff Ticket Queue & List Queries
-- **Reviewer Comment:** IT Staff Ticket Queue implementation is comprehensive. The 300ms debounce on the search input works smoothly, and multi-criteria filters for status, category, priority, and owner work simultaneously with pagination. Confirmed that Requesters attempting to call `/api/v1/staff/tickets` receive HTTP 403 Forbidden. The desktop table collapses into stacked cards on mobile with zero horizontal overflow.
-- **Author Response:** Thanks for verifying the role-based 403 authorization guard and mobile card collapse.
+- **Reviewer Comment:** I have reviewed the code, Prisma schema updates, server endpoints, frontend components, and automated test logs for Issue 13 and verified that all implementation requirements are satisfied. My manual UI tests have all passed.
+- **Author Response:** Thank you for the review.
 
 #### Issue 14: IT Staff Ticket Detail, Operational Controls, Comments & Notes
-- **Reviewer Comment:** Staff Ticket Detail features are fully verified. Claiming tickets sets the owner to the active staff member, IT Priority adjustments update the badge dynamically, and the Status Transition Matrix correctly prevents illegal status jumps. Crucially, I verified the confidentiality boundary: Public comments are visible to both Requester and Staff, while the amber Confidential Internal Notes section (with 🔒 lock icon) is completely absent from the Requester view and stripped from network responses. Also verified the "Problem Appears Resolved" button records the requester confirmation timestamp without closing the ticket prematurely.
-- **Author Response:** Appreciate the careful audit of the internal notes confidentiality boundary and requester resolution indication rules!
+- **Reviewer Comment:** I have reviewed the code, Prisma schema updates, server endpoints, frontend components, and automated test logs for PR [#4](https://github.com/ShortXander101205/toktickit/issues/4) (Issue 14) and verified that all implementation requirements are satisfied. Manual testing have all passed. making comments, changing ticket details, the whole shebang.
+- **Author Response:** I have completed the fixes on the implementations and PR. Thank you for reviewing and your guidance.
 
 #### Issue 15: Administrator User Management & Account Safety
-- **Reviewer Comment:** User management is robust. Admin can search and filter the roster, create new users with single roles, and edit user details. Tested the two critical administrative safety invariants: an admin cannot deactivate their own account (BR-11), and deactivating the last active administrator is strictly blocked (BR-12). Also verified that resetting a user's initial password sets `mustChangePassword: true` so they are forced to rotate credentials upon next login.
-- **Author Response:** Thanks for thoroughly testing the BR-11 and BR-12 safety invariants and temporary credential provisioning.
+- **Reviewer Comment:** I have reviewed the code, I verified that all implementation requirements are satisfied: the `/api/v1/admin/users/*` backend endpoints deliver user search, role filtering, account creation with initial passwords, account updates, and password resets while strictly enforcing business safety rules; direct REST API requests by unauthorized roles (REQUESTER and IT_STAFF) are rejected with 403 Forbidden; the Zen Green User Management dashboard and slideouts render smoothly; and all npm tests pass cleanly following `npx prisma migrate reset --force`. The only minor bug would be the double plus signs on the create button, but other than that, it looks fine.
+- **Author Response:** Thanks for the deep review done on my program, I appreciate it a lot!!!!!!
 
 #### Issue 16: End-to-End Test Suite, Responsive Polish & Staged Release Verification
-- **Reviewer Comment:** End-to-end verification and responsive polish look fantastic. All 3 Playwright test suites (`authentication.spec.ts`, `staff-ticket-flow.spec.ts`, and `user-administration.spec.ts`) pass cleanly on Chromium, full-page screenshot artifacts across Desktop, Tablet, and Mobile are saved in `artifacts/lab-03/screenshots/`, and automated assertions confirm zero horizontal scroll across all breakpoints. All 251 test cases pass across the workspace with 100% AC traceability. Staging is ready for production merge!
-- **Author Response:** Thank you so much for the thorough review, guidance, and verification throughout Sprint 3!
+- **Reviewer Comment:** All looks good. Only thing that is left is completing `ai-use.md` and `reviewer.md`.
+- **Author Response:** Thank you so much for the review. I will finish up my `ai-use.md` and `reviewer.md` afterwards, I appreciate the comment.
 
 ---
 
