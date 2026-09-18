@@ -95,8 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const data = await changePasswordApi(payload);
-      setUser(data.user);
-      return data.user;
+      const updatedUser: AuthUser = (data as any)?.user || {
+        ...user!,
+        mustChangePassword: false,
+      };
+      setUser(updatedUser);
+      return updatedUser;
     } catch (err: any) {
       const msg = err?.response?.error?.message || err?.message || "Failed to update password.";
       setError(msg);
@@ -104,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const contextValue = useMemo(
     () => ({

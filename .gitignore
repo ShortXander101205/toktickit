@@ -23,3 +23,5 @@ playwright-report/
 
 # Ignore E2E test screenshots / artifacts
 artifacts/lab-02/screenshots/
+artifacts/lab-03/screenshots/
+artifacts/**/screenshots/
