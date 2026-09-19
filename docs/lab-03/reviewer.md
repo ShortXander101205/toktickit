@@ -21,28 +21,35 @@
 ### Reviewer Comments Received & Author Responses
 
 #### Issue 11: Sprint 3 Engineering Contract & Software Test Planning
+
 - **Reviewer Comment:** All authoritative Sprint 3 engineering contract documents and directory scaffolding have been authored and verified against `Lab_03_labsheet.pdf`, `TokTickIT-System-Level-SDS-v1.0.docx`, and our project scope.
 - **Author Response:** Thank you for the helpful review.
 
 #### Issue 12: Authentication Foundation, User Migration & Application Shell Navigation
+
 - **Reviewer Comment:** I tried running manually testing this on my computer, but found out that some parts were missing, such as the error messages not displaying once the incorrect passwords were inputted. npm tests on the server would fail with error 400 or similar. I believed this isn't a me problem, as I have correctly reset my database and seeded your data.
-  
+
   Reviewing this code for a second time, Prisma schema migration, server auth endpoints, frontend components, and automated test logs for Issue 12 are verified and all implementation requirements are satisfied. All my manual tests have passed. I saw the login screen, the new password screen, the requester role, and the correct UX.
+
 - **Author Response:** Thanks for running those manual tests and catching those issues earlier. I updated the implementation and test coverage to make sure everything aligned with the requirements. Thank you for the multiple reviews.
 
 #### Issue 13: IT Staff Ticket Queue & List Queries
+
 - **Reviewer Comment:** I have reviewed the code, Prisma schema updates, server endpoints, frontend components, and automated test logs for Issue 13 and verified that all implementation requirements are satisfied. My manual UI tests have all passed.
 - **Author Response:** Thank you for the review.
 
 #### Issue 14: IT Staff Ticket Detail, Operational Controls, Comments & Notes
+
 - **Reviewer Comment:** I have reviewed the code, Prisma schema updates, server endpoints, frontend components, and automated test logs for PR [#4](https://github.com/ShortXander101205/toktickit/issues/4) (Issue 14) and verified that all implementation requirements are satisfied. Manual testing have all passed. making comments, changing ticket details, the whole shebang.
 - **Author Response:** I have completed the fixes on the implementations and PR. Thank you for reviewing and your guidance.
 
 #### Issue 15: Administrator User Management & Account Safety
+
 - **Reviewer Comment:** I have reviewed the code, I verified that all implementation requirements are satisfied: the `/api/v1/admin/users/*` backend endpoints deliver user search, role filtering, account creation with initial passwords, account updates, and password resets while strictly enforcing business safety rules; direct REST API requests by unauthorized roles (REQUESTER and IT_STAFF) are rejected with 403 Forbidden; the Zen Green User Management dashboard and slideouts render smoothly; and all npm tests pass cleanly following `npx prisma migrate reset --force`. The only minor bug would be the double plus signs on the create button, but other than that, it looks fine.
 - **Author Response:** Thanks for the deep review done on my program, I appreciate it a lot!!!!!!
 
 #### Issue 16: End-to-End Test Suite, Responsive Polish & Staged Release Verification
+
 - **Reviewer Comment:** All looks good. Only thing that is left is completing `ai-use.md` and `reviewer.md`.
 - **Author Response:** Thank you so much for the review. I will finish up my `ai-use.md` and `reviewer.md` afterwards, I appreciate the comment.
 
@@ -62,25 +69,35 @@
 ### My Review Comments & Partner's Responses
 
 #### Issue 11: Sprint 3 Engineering Contract & Software Test Planning
-- **My Comment:** Specifications and test tables in `docs/lab-03/` match the course requirements and SDS v1.0. The seed script populates 11 users and 64 tickets idempotently. All clear to proceed.
-- **Partner Response:** Thank you for reviewing the contract and seed specifications!
+
+- **My Comment:** Establishes the engineering contracts, UI design specifications, and software test planning for Lab 3.
+- **Partner Response:** Thanks for reviewing.
 
 #### Issue 12: Authentication Foundation, User Migration & Application Shell Navigation
-- **My Comment:** Verified authentication workflows. Passwords validate against all 6 complexity criteria, sessions are managed securely via HttpOnly cookies, and the header renders appropriate role pills with Zen Green styling.
-- **Partner Response:** Thank you! All feedback incorporated and verified against unit tests.
+
+- **My Comment:** npm tests failed on my server.
+- **Partner Response:** I have made changes to my migration files, please run them again
+- **My Comment:** I ran manual tests across different authentication cases, and everything worked as expected. It passed the review accordingly and it is ready for merging.
+- **Partner Response:** Thank you for your patience on reviewing!
 
 #### Issue 13: IT Staff Ticket Queue & List Queries
-- **My Comment:** The ticket queue search, category filter, and status filter interact smoothly without jitter. Pagination toolbar handles page shifts accurately, and Requesters are blocked with 403 Forbidden. Approved!
-- **Partner Response:** Thanks for checking the queue query parameters and role guards.
+
+- **My Comment:** I am having issues with the server, I am unable to reset the database. Therefore, the npm test failed.
+- **Partner Response:** I have fixed the issues with prisma migration, please recheck for me
+- **My Comment:** The new implementation has fixed the previous issue, and manual testing has been approved. All implementations are done.
+- **Partner Response:** Thank you for reviewing!
 
 #### Issue 14: IT Staff Ticket Detail, Operational Controls, Comments & Notes
-- **My Comment:** Confirmed that ticket ownership claim, priority updates, and status transitions adhere to the SDS transition matrix. Checked that internal notes have distinct amber styling and are omitted from non-staff responses.
-- **Partner Response:** Appreciate the verification of the status state machine and note privacy rules.
+
+- **My Comment:** Issue 14 gives IT Staff a detail screen to claim tickets, set priorities, and update statuses. It also adds two comment threads.
+- **Partner Response:** Thanks for reviewing, it means a lot!
 
 #### Issue 15: Administrator User Management & Account Safety
-- **My Comment:** Validated user roster interactions and safety invariants. Both BR-11 (self-deactivation block) and BR-12 (last active admin protection) prevent lockout scenarios. Password reset properly flags the target account.
-- **Partner Response:** Thank you for testing the administrative edge cases and safety alerts.
+
+- **My Comment:** Issue 15 is complete with admin user management screens, account safety protections, and all tests passing.
+- **Partner Response:** Thank you for your testing and review!
 
 #### Issue 16: End-to-End Test Suite, Responsive Polish & Staged Release Verification
-- **My Comment:** All Playwright E2E browser tests pass across all roles and viewports. No horizontal scroll detected on mobile devices, touch targets comply with 44px minimums, and screenshot deliverables are fully generated.
-- **Partner Response:** Thank you for the detailed peer review and release verification!
+
+- **My Comment:** The final issue looks good.
+- **Partner Response:** Thank you for reviewing and working with me for lab 3!
