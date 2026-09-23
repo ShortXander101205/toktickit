@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Priority, TicketStatus } from "@prisma/client";
 import fs from "fs";
 import path from "path";
 import app from "../../src/app.js";
@@ -39,9 +39,9 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         relatedSystemId: sysLaptop!.id,
         summary: "Attachment testing ticket",
         description: "Ticket dedicated to testing file upload, download, and soft removal.",
-        requestedPriority: "Medium",
-        itPriority: "Medium",
-        currentStatus: "New",
+        requestedPriority: Priority.MEDIUM,
+        itPriority: Priority.MEDIUM,
+        currentStatus: TicketStatus.NEW,
       },
     });
 
@@ -54,9 +54,9 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         relatedSystemId: sysLaptop!.id,
         summary: "Requester 2 ticket",
         description: "Requester 2 ticket for cross-requester rejection tests.",
-        requestedPriority: "Low",
-        itPriority: "Low",
-        currentStatus: "New",
+        requestedPriority: Priority.LOW,
+        itPriority: Priority.LOW,
+        currentStatus: TicketStatus.NEW,
       },
     });
 
@@ -169,9 +169,9 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         relatedSystemId: sysLaptop!.id,
         summary: "Quantity limit test ticket",
         description: "Testing active attachment limit of 5 files.",
-        requestedPriority: "Medium",
-        itPriority: "Medium",
-        currentStatus: "New",
+        requestedPriority: Priority.MEDIUM,
+        itPriority: Priority.MEDIUM,
+        currentStatus: TicketStatus.NEW,
       },
     });
 
@@ -209,9 +209,9 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         relatedSystemId: sysLaptop!.id,
         summary: "Soft-removed boundary check",
         description: "Verifying soft-removed files do not count toward 5-file limit.",
-        requestedPriority: "Medium",
-        itPriority: "Medium",
-        currentStatus: "New",
+        requestedPriority: Priority.MEDIUM,
+        itPriority: Priority.MEDIUM,
+        currentStatus: TicketStatus.NEW,
       },
     });
 
@@ -240,7 +240,7 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         isRemoved: true,
         removalReason: "Old file removed",
         removedAt: new Date(),
-        removedByRequesterId: 1,
+        removedByUserId: 1,
       },
     });
 
@@ -376,7 +376,7 @@ describe("API: Attachment Management (/api/tickets/:id/attachments & /api/attach
         isRemoved: true,
         removalReason: "File deleted due to privacy concern",
         removedAt: new Date(),
-        removedByRequesterId: 1,
+        removedByUserId: 1,
       },
     });
 

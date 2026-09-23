@@ -12,32 +12,36 @@ export const attachmentsRouter = Router();
 export async function handleDownloadAttachment(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID from header
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "MISSING_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-        details: [],
-      },
-    });
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
   }
 
-  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(requesterId)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-        details: [],
-      },
-    });
-  }
-
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id: requesterId },
   });
 
@@ -151,32 +155,36 @@ export async function handleDownloadAttachment(req: Request, res: Response) {
 export async function handleSoftRemoveAttachment(req: Request, res: Response) {
   const prisma = getPrisma();
 
-  // 1. Verify and extract requester ID from header
-  const rawRequesterId = req.headers["x-requester-id"];
-  if (!rawRequesterId) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "MISSING_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header is required to identify the submitting requester.",
-        details: [],
-      },
-    });
+  let requesterId: number;
+  if (req.user) {
+    requesterId = req.user.id;
+  } else {
+    const rawRequesterId = req.headers["x-requester-id"];
+    if (!rawRequesterId) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header is required to identify the submitting requester.",
+          details: [],
+        },
+      });
+    }
+
+    requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
+    if (isNaN(requesterId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_REQUESTER_HEADER",
+          message: "The 'x-requester-id' header must be a valid integer ID.",
+          details: [],
+        },
+      });
+    }
   }
 
-  const requesterId = parseInt(Array.isArray(rawRequesterId) ? rawRequesterId[0] : rawRequesterId, 10);
-  if (isNaN(requesterId)) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "INVALID_REQUESTER_HEADER",
-        message: "The 'x-requester-id' header must be a valid integer ID.",
-        details: [],
-      },
-    });
-  }
-
-  const requester = await prisma.requesterUser.findUnique({
+  const requester = await prisma.user.findUnique({
     where: { id: requesterId },
   });
 
@@ -245,7 +253,7 @@ export async function handleSoftRemoveAttachment(req: Request, res: Response) {
           isRemoved: true,
           removalReason: attachment.removalReason,
           removedAt: attachment.removedAt?.toISOString() || null,
-          removedByRequesterId: attachment.removedByRequesterId,
+          removedByUserId: attachment.removedByUserId,
         },
       });
     }
@@ -277,7 +285,7 @@ export async function handleSoftRemoveAttachment(req: Request, res: Response) {
         isRemoved: true,
         removalReason: trimmedReason,
         removedAt,
-        removedByRequesterId: requester.id,
+        removedByUserId: requester.id,
       },
     });
 
@@ -294,7 +302,8 @@ export async function handleSoftRemoveAttachment(req: Request, res: Response) {
         isRemoved: true,
         removalReason: updated.removalReason,
         removedAt: updated.removedAt?.toISOString() || null,
-        removedByRequesterId: updated.removedByRequesterId,
+        removedByUserId: updated.removedByUserId,
+        removedByRequesterId: updated.removedByUserId,
       },
     });
   } catch (error: any) {

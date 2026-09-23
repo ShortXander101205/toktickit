@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Priority, TicketStatus } from "@prisma/client";
 import app from "../../src/app.js";
 import { seed } from "../../prisma/seed.js";
 
@@ -32,9 +32,9 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
         relatedSystemId: sysLaptop!.id,
         summary: "Laptop battery drains quickly",
         description: "My laptop battery is draining much faster than usual even when idle.",
-        requestedPriority: "High",
-        itPriority: "High",
-        currentStatus: "New",
+        requestedPriority: Priority.HIGH,
+        itPriority: Priority.HIGH,
+        currentStatus: TicketStatus.NEW,
       },
     });
 
@@ -61,7 +61,7 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
         isRemoved: true,
         removalReason: "Uploaded incorrect diagnostic report from previous semester",
         removedAt: new Date("2026-09-03T11:15:00.000Z"),
-        removedByRequesterId: 1,
+        removedByUserId: 1,
       },
     });
 
@@ -74,9 +74,9 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
         relatedSystemId: sysLaptop!.id,
         summary: "Monitor flickering issue",
         description: "External monitor flickers constantly when plugged into dock.",
-        requestedPriority: "Medium",
-        itPriority: "Medium",
-        currentStatus: "New",
+        requestedPriority: Priority.MEDIUM,
+        itPriority: Priority.MEDIUM,
+        currentStatus: TicketStatus.NEW,
       },
     });
   });
@@ -167,7 +167,7 @@ describe("API: GET /api/tickets/:id (Feature 9 Ticket Detail - AC-11, AC-12)", (
   });
 
   it("TD-06 (Inactive Requester - 404): returns 404 Not Found when requester is inactive", async () => {
-    const inactiveUser = await prisma.requesterUser.findFirst({ where: { isActive: false } });
+    const inactiveUser = await prisma.user.findFirst({ where: { isActive: false, role: "REQUESTER" } });
     if (inactiveUser) {
       const res = await request(app)
         .get(`/api/tickets/${ticketRequester1.id}`)

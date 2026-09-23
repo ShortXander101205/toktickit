@@ -1,26 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
 import { AppHeader } from "./components/AppHeader.js";
+import { Login } from "./components/Login.js";
+import { ChangePassword } from "./components/ChangePassword.js";
 import { RequesterSelector } from "./components/RequesterSelector.js";
 import { checkSystem, Category } from "./api.js";
 
 import { CreateTicket } from "./components/CreateTicket.js";
 import { MyTickets } from "./components/MyTickets.js";
 import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
+import { StaffTicketDetail } from "./components/StaffTicketDetail.js";
+import { StaffTicketQueue } from "./components/StaffTicketQueue.js";
+import { UserManagement } from "./components/UserManagement.js";
 
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
+  const { user } = useAuth();
   const { currentRequester, isSwitchModalOpen, closeSwitchModal } = useRequester();
-  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket">("my-tickets");
+  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket" | "ticket-queue" | "admin-users">("my-tickets");
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+
+  // Default to ticket queue for IT Staff and Administrator
+  useEffect(() => {
+    if (user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") {
+      setActiveTab("ticket-queue");
+    } else {
+      setActiveTab("my-tickets");
+    }
+  }, [user?.role]);
 
   // System status checker (preserved from Lab 1)
   const [sysState, setSysState] = useState<SystemCheckState>("idle");
   const [categories, setCategories] = useState<Category[]>([]);
 
-  // Reset selected ticket detail when requester switches
-  function handleTabChange(tab: "my-tickets" | "create-ticket") {
+  // Reset selected ticket detail when tab switches
+  function handleTabChange(tab: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users") {
     setSelectedTicketId(null);
     setActiveTab(tab);
   }
@@ -36,37 +52,54 @@ function MainApp() {
     }
   }
 
+  const isAuthenticated = Boolean(user);
+  const mustChangePassword = Boolean(user?.mustChangePassword);
+
   return (
     <div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: "var(--color-page-bg)" }}>
       {/* App Shell Header */}
       <AppHeader currentTab={activeTab} onTabChange={handleTabChange} />
 
-      {/* Mode A: Blocking Requester Selector (if no persona selected) */}
-      {!currentRequester && <RequesterSelector isSwitchMode={false} />}
-
-      {/* Mode B: Switch Requester Modal (invoked from header) */}
+      {/* Mode B: Switch Requester Modal (invoked from header if present) */}
       {isSwitchModalOpen && (
         <RequesterSelector isSwitchMode={true} onCancel={closeSwitchModal} />
       )}
 
       {/* Main Workspace Container */}
       <main className="container-xl py-4 flex-grow-1" style={{ maxWidth: "1200px" }}>
-        {currentRequester ? (
+        {!isAuthenticated ? (
+          <Login />
+        ) : mustChangePassword ? (
+          <ChangePassword onSuccess={() => setSelectedTicketId(null)} />
+        ) : (
           <div>
             {selectedTicketId !== null ? (
-              <RequesterTicketDetail
-                ticketId={selectedTicketId}
-                onBack={() => setSelectedTicketId(null)}
+              user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? (
+                <StaffTicketDetail
+                  ticketId={selectedTicketId}
+                  onBack={() => setSelectedTicketId(null)}
+                />
+              ) : (
+                <RequesterTicketDetail
+                  ticketId={selectedTicketId}
+                  onBack={() => setSelectedTicketId(null)}
+                />
+              )
+            ) : activeTab === "admin-users" && user?.role === "ADMINISTRATOR" ? (
+              <UserManagement />
+            ) : activeTab === "ticket-queue" ? (
+              <StaffTicketQueue
+                onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}
               />
             ) : activeTab === "create-ticket" ? (
               <CreateTicket
                 onSuccess={() => {
                   setSelectedTicketId(null);
-                  setActiveTab("my-tickets");
+                  setActiveTab(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? "ticket-queue" : "my-tickets");
                 }}
                 onCancel={() => {
                   setSelectedTicketId(null);
-                  setActiveTab("my-tickets");
+                  setActiveTab(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? "ticket-queue" : "my-tickets");
                 }}
               />
             ) : (
@@ -79,7 +112,7 @@ function MainApp() {
               />
             )}
           </div>
-        ) : null}
+        )}
 
         {/* System Diagnostics / Lab 1 Compatibility Card */}
         <div
@@ -128,8 +161,10 @@ function MainApp() {
 
 export default function App() {
   return (
-    <RequesterProvider>
-      <MainApp />
-    </RequesterProvider>
+    <AuthProvider>
+      <RequesterProvider>
+        <MainApp />
+      </RequesterProvider>
+    </AuthProvider>
   );
 }

@@ -6,8 +6,8 @@ export const requestersRouter = Router();
 // Handler for GET /api/requesters
 export async function getActiveRequesters(_req: Request, res: Response): Promise<void> {
   try {
-    const requesters = await getPrisma().requesterUser.findMany({
-      where: { isActive: true },
+    const requesters = await getPrisma().user.findMany({
+      where: { isActive: true, role: "REQUESTER" },
       orderBy: { name: "asc" },
     });
     res.status(200).json({ success: true, data: requesters });
