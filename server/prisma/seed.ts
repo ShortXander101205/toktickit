@@ -1097,14 +1097,24 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
     sysMap.set(s.name, s.id);
   }
 
-  // 2. Clean attachments and tickets before seeding demo data
+  // 2. Clean attachments, actions taken, tickets, and non-seed test users before seeding demo data
+  await prisma.actionTaken.deleteMany();
   await prisma.attachment.deleteMany();
   await prisma.ticket.deleteMany();
+  const seedEmails = USERS_SEED.map((u) => u.email.toLowerCase());
+  await prisma.user.deleteMany({
+    where: {
+      email: {
+        notIn: seedEmails,
+      },
+    },
+  });
 
   // 3. Insert demo tickets
   let insertedCount = 0;
   const sompongId = userMap.get("sompong.it@kmutt.ac.th");
   const wichaiId = userMap.get("wichai.sup@kmutt.ac.th");
+  const anongId = userMap.get("anong.net@kmutt.ac.th");
 
   for (let idx = 0; idx < DEMO_TICKETS_SEED.length; idx++) {
     const t = DEMO_TICKETS_SEED[idx];
@@ -1196,6 +1206,120 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
       });
     }
 
+    // Seed Actions Taken (Sprint 4 Parent-Child Work Tracking)
+    if (idx === 0) {
+      // Ticket 1: Multi-Staff Collaborative Actions (3 actions by Sompong, Wichai, and Anong)
+      await prisma.actionTaken.createMany({
+        data: [
+          {
+            ticketId: createdTicket.id,
+            performedById: sompongId ?? requesterId,
+            actionDateTime: new Date(t.createdAt.getTime() + 1800000),
+            actionDescription: "Conducted Wi-Fi signal attenuation survey on Library 4th floor west wing.",
+            result: "Detected severe 5GHz attenuation near west perimeter glass due to low RF transmitter gain.",
+            followUpRequired: true,
+            followUpNote: "Coordinate with Network Operations to adjust AP-LIB-4F transmit power.",
+            attachmentNotes: "wifi_survey_floor4.pdf",
+            version: 1,
+            createdAt: new Date(t.createdAt.getTime() + 1800000),
+            updatedAt: new Date(t.createdAt.getTime() + 1800000),
+          },
+          {
+            ticketId: createdTicket.id,
+            performedById: wichaiId ?? requesterId,
+            actionDateTime: new Date(t.createdAt.getTime() + 3600000),
+            actionDescription: "Remotely rebooted access point AP-LIB-4F and reloaded channel allocation profile.",
+            result: "Access point online with zero client association drops over a 15-minute test period.",
+            followUpRequired: false,
+            followUpNote: null,
+            attachmentNotes: null,
+            version: 1,
+            createdAt: new Date(t.createdAt.getTime() + 3600000),
+            updatedAt: new Date(t.createdAt.getTime() + 3600000),
+          },
+          {
+            ticketId: createdTicket.id,
+            performedById: anongId ?? sompongId ?? requesterId,
+            actionDateTime: new Date(t.createdAt.getTime() + 5400000),
+            actionDescription: "Replaced damaged Cat6 patch cable at floor switch rack SW-LIB-4.",
+            result: "Gigabit link negotiated cleanly with 0 CRC error frames.",
+            followUpRequired: false,
+            followUpNote: null,
+            attachmentNotes: null,
+            version: 1,
+            createdAt: new Date(t.createdAt.getTime() + 5400000),
+            updatedAt: new Date(t.createdAt.getTime() + 5400000),
+          },
+        ],
+      });
+    } else if (idx === 1) {
+      // Ticket 2: Single Completed Action Taken
+      await prisma.actionTaken.create({
+        data: {
+          ticketId: createdTicket.id,
+          performedById: sompongId ?? requesterId,
+          actionDateTime: new Date(t.createdAt.getTime() + 1800000),
+          actionDescription: "Inspected switch port configuration and cleared sticky MAC address table.",
+          result: "Port security violation cleared. Client device successfully acquired DHCP lease.",
+          followUpRequired: false,
+          followUpNote: null,
+          attachmentNotes: "switch_config_dump.txt",
+          version: 1,
+          createdAt: new Date(t.createdAt.getTime() + 1800000),
+          updatedAt: new Date(t.createdAt.getTime() + 1800000),
+        },
+      });
+    } else if (idx === 4) {
+      // Ticket 5: Pending Follow-Up Action Taken
+      await prisma.actionTaken.create({
+        data: {
+          ticketId: createdTicket.id,
+          performedById: wichaiId ?? requesterId,
+          actionDateTime: new Date(t.createdAt.getTime() + 1800000),
+          actionDescription: "Ran battery health diagnostics via OEM management utility.",
+          result: "Battery cycle count is 1140 cycles; maximum capacity degraded to 42%.",
+          followUpRequired: true,
+          followUpNote: "Awaiting user to bring laptop to Central IT service desk for replacement.",
+          attachmentNotes: "diagnostic_screen.png",
+          version: 1,
+          createdAt: new Date(t.createdAt.getTime() + 1800000),
+          updatedAt: new Date(t.createdAt.getTime() + 1800000),
+        },
+      });
+    } else if (idx === 5) {
+      // Ticket 6: Resolved with Historical Completed Actions
+      await prisma.actionTaken.createMany({
+        data: [
+          {
+            ticketId: createdTicket.id,
+            performedById: sompongId ?? requesterId,
+            actionDateTime: new Date(t.createdAt.getTime() + 1200000),
+            actionDescription: "Cleared DNS cache and flushed stale ARP tables on local gateway.",
+            result: "Resolved domain name lookup timeout.",
+            followUpRequired: false,
+            followUpNote: null,
+            attachmentNotes: null,
+            version: 1,
+            createdAt: new Date(t.createdAt.getTime() + 1200000),
+            updatedAt: new Date(t.createdAt.getTime() + 1200000),
+          },
+          {
+            ticketId: createdTicket.id,
+            performedById: wichaiId ?? requesterId,
+            actionDateTime: new Date(t.createdAt.getTime() + 2400000),
+            actionDescription: "Verified student portal access across multiple client devices.",
+            result: "User confirmed normal page load latency.",
+            followUpRequired: false,
+            followUpNote: null,
+            attachmentNotes: null,
+            version: 1,
+            createdAt: new Date(t.createdAt.getTime() + 2400000),
+            updatedAt: new Date(t.createdAt.getTime() + 2400000),
+          },
+        ],
+      });
+    }
+
     insertedCount++;
   }
 
@@ -1208,9 +1332,12 @@ export async function seedDemoTickets(prisma: PrismaClient): Promise<void> {
     create: { year: currentYear, nextVal: nextSeq },
   });
 
-  // 5. Synchronize PostgreSQL autoincrement sequence for tickets table
+  // 5. Synchronize PostgreSQL autoincrement sequences
   await prisma.$executeRawUnsafe(
     `SELECT setval(pg_get_serial_sequence('tickets', 'id'), coalesce(max(id), 1)) FROM tickets;`
+  );
+  await prisma.$executeRawUnsafe(
+    `SELECT setval(pg_get_serial_sequence('actions_taken', 'id'), coalesce(max(id), 1)) FROM actions_taken;`
   );
 
   console.log(`Seeded ${insertedCount} realistic demo tickets across ${users.length} accounts.`);
