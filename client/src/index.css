@@ -31,6 +31,14 @@
   --focus-ring: 0 0 0 3px rgba(11, 122, 70, 0.2);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-modal: 0 10px 25px rgba(0, 0, 0, 0.15);
+
+  /* Sprint 4 Line-Item & Actions Taken Tokens */
+  --color-action-item-border: #d1d5db;
+  --color-action-item-hover: #f0fdf4;
+  --color-action-performer-bg: #e0e7ff;
+  --color-action-performer-text: #3730a3;
+  --color-followup-alert-bg: #fef3c7;
+  --color-followup-alert-text: #92400e;
 }
 
 html,
@@ -150,5 +158,241 @@ button:disabled,
   .form-control,
   .pagination .page-link {
     min-height: 44px;
+  }
+}
+
+
+/* ========================================================================= */
+/* Sprint 4: Actions Taken Line-Item Section & Responsive Layouts            */
+/* ========================================================================= */
+.actions-taken-section {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-action-item-border);
+  border-left: 4px solid var(--color-primary-green);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow-x: hidden;
+}
+
+.at-header-bar {
+  background-color: var(--color-pale-green);
+  border-bottom: 1px solid var(--color-action-item-border);
+  padding: 0.875rem 1.25rem;
+  border-top-right-radius: 7px;
+}
+
+.at-count-badge {
+  background-color: var(--color-primary-green);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.at-table-desktop {
+  display: block;
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.at-table-desktop thead {
+  display: none;
+}
+
+.at-table-desktop tbody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  width: 100%;
+}
+
+.at-table-desktop tbody tr.at-row-card {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: start;
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-action-item-border);
+  border-left: 4px solid var(--color-secondary-green);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-card);
+  transition: background-color 0.12s ease-in-out, border-color 0.12s ease-in-out;
+}
+
+.at-table-desktop tbody tr.at-row-card:hover {
+  background-color: var(--color-action-item-hover);
+  border-color: var(--color-secondary-green);
+}
+
+.at-table-desktop tbody td {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  color: var(--color-text-primary);
+  word-break: break-word;
+  min-width: 0;
+}
+
+.at-table-desktop tbody td::before {
+  content: attr(data-label);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary-green);
+  margin-bottom: 0.25rem;
+}
+
+/* Top Metadata Row of each Action Card */
+.at-table-desktop tbody td[data-label="No."] {
+  grid-column: span 2;
+}
+
+.at-table-desktop tbody td[data-label="Date/Time"] {
+  grid-column: span 4;
+  white-space: nowrap;
+}
+
+.at-table-desktop tbody td[data-label="Performed By"] {
+  grid-column: span 4;
+}
+
+.at-table-desktop tbody td[data-label="Actions"] {
+  grid-column: 11 / 13;
+  grid-row: 1;
+  justify-self: end;
+  align-self: center;
+}
+
+.at-table-desktop tbody td[data-label="Actions"]::before {
+  display: none;
+}
+
+/* Middle Content Row: Description & Result side-by-side boxes */
+.at-table-desktop tbody td[data-label="Action Description"],
+.at-table-desktop tbody td[data-label="Result / Outcome"] {
+  grid-column: span 6;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  line-height: 1.5;
+}
+
+/* Bottom Row: Follow-Up Status & Follow-Up Note */
+.at-table-desktop tbody td[data-label="Follow-Up Status"] {
+  grid-column: 1 / -1;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--color-field-readonly-border);
+}
+
+.at-performer-badge {
+  background-color: var(--color-action-performer-bg);
+  color: var(--color-action-performer-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.at-followup-badge-required {
+  background-color: var(--color-followup-alert-bg);
+  color: var(--color-followup-alert-text);
+  border: 1px solid #fcd34d;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+}
+
+.at-followup-badge-completed {
+  background-color: var(--color-pale-green);
+  color: var(--color-primary-green);
+  border: 1px solid #a7f3d0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+}
+
+.at-followup-note-box {
+  background-color: var(--color-followup-alert-bg);
+  color: var(--color-followup-alert-text);
+  border-left: 3px solid #d97706;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  margin-top: 0.5rem;
+  word-break: break-word;
+}
+
+.at-attachment-note-caption {
+  background-color: #ffffff;
+  border: 1px solid var(--color-field-readonly-border);
+  color: var(--color-text-muted);
+  border-radius: 4px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  word-break: break-word;
+}
+
+.at-form-container {
+  background-color: var(--color-page-bg);
+  border: 1px solid var(--color-action-item-border);
+  border-top: 3px solid var(--color-secondary-green);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+/* Tablet & Mobile Responsive Stacking (< 768px) */
+@media (max-width: 767.98px) {
+  .at-table-desktop tbody tr.at-row-card {
+    grid-template-columns: 1fr 1fr;
+    padding: 0.875rem 1rem;
+  }
+
+  .at-table-desktop tbody td[data-label="No."] {
+    grid-column: 1 / 2;
+  }
+
+  .at-table-desktop tbody td[data-label="Actions"] {
+    grid-column: 2 / 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .at-table-desktop tbody td[data-label="Date/Time"],
+  .at-table-desktop tbody td[data-label="Performed By"],
+  .at-table-desktop tbody td[data-label="Action Description"],
+  .at-table-desktop tbody td[data-label="Result / Outcome"],
+  .at-table-desktop tbody td[data-label="Follow-Up Status"] {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .actions-taken-section .btn,
+  .actions-taken-section .form-control,
+  .actions-taken-section .form-check-input {
+    min-height: 44px;
+  }
+  .at-form-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .at-form-actions .btn {
+    width: 100%;
   }
 }

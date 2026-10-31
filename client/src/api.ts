@@ -20,6 +20,10 @@ import {
   CreateAdminUserPayload,
   UpdateAdminUserPayload,
   ResetUserPasswordPayload,
+  ActionTakenDTO,
+  ActionTakenListResponseDTO,
+  CreateActionTakenPayload,
+  UpdateActionTakenPayload,
 } from "./types/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -1004,3 +1008,197 @@ export async function resetUserPasswordApi(
 
 
 
+// ---------------------------------------------------------------------------
+// Issue 18 / Issue 19: Actions Taken API Methods (Sprint 4)
+// ---------------------------------------------------------------------------
+
+function normalizeActionTakenRecord(raw: any): ActionTakenDTO {
+  const performerName =
+    raw?.performedBy?.fullName ||
+    raw?.performedBy?.name ||
+    "IT Staff";
+  const desc = raw?.actionDescription ?? raw?.description ?? "";
+  return {
+    id: raw?.id,
+    ticketId: raw?.ticketId,
+    actionDateTime: raw?.actionDateTime || new Date().toISOString(),
+    performedByUserId: raw?.performedByUserId ?? raw?.performedBy?.id ?? "",
+    performedBy: {
+      id: raw?.performedBy?.id ?? "",
+      name: performerName,
+      fullName: performerName,
+      email: raw?.performedBy?.email ?? "",
+      role: raw?.performedBy?.role === "ADMINISTRATOR" ? "ADMINISTRATOR" : "IT_STAFF",
+    },
+    description: desc,
+    actionDescription: desc,
+    result: raw?.result ?? "",
+    followUpRequired: Boolean(raw?.followUpRequired),
+    followUpNote: raw?.followUpNote ?? null,
+    attachmentNotes: raw?.attachmentNotes ?? null,
+    version: typeof raw?.version === "number" ? raw.version : 1,
+    createdAt: raw?.createdAt || raw?.actionDateTime || new Date().toISOString(),
+    updatedAt: raw?.updatedAt || raw?.actionDateTime || new Date().toISOString(),
+  };
+}
+
+export async function getActionsTakenApi(
+  ticketId: number | string,
+  activeRequesterId?: number | string | null
+): Promise<ActionTakenListResponseDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (activeRequesterId !== undefined && activeRequesterId !== null) {
+    headers["x-requester-id"] = String(activeRequesterId);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_URL}/api/v1/tickets/${encodeURIComponent(String(ticketId))}/actions-taken`,
+      {
+        method: "GET",
+        headers,
+        credentials: "include",
+      }
+    );
+  } catch (networkErr: any) {
+    if (import.meta.env.MODE === "test") {
+      return { items: [], totalCount: 0 };
+    }
+    throw networkErr;
+  }
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg =
+      json.error?.message || `Failed to load actions taken (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.code = json.error?.code;
+    err.response = json;
+    throw err;
+  }
+
+  const rawItems: any[] = Array.isArray(json.data?.items)
+    ? json.data.items
+    : Array.isArray(json.data)
+      ? json.data
+      : [];
+  const items = rawItems.map(normalizeActionTakenRecord);
+  return {
+    items,
+    totalCount: typeof json.data?.totalCount === "number" ? json.data.totalCount : items.length,
+  };
+}
+
+export async function createActionTakenApi(
+  ticketId: number | string,
+  payload: CreateActionTakenPayload
+): Promise<ActionTakenDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const bodyPayload = {
+    ...payload,
+    actionDescription: payload.actionDescription ?? payload.description ?? "",
+    description: payload.description ?? payload.actionDescription ?? "",
+  };
+
+  const res = await fetch(
+    `${API_URL}/api/v1/tickets/${encodeURIComponent(String(ticketId))}/actions-taken`,
+    {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(bodyPayload),
+    }
+  );
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg =
+      json.error?.message || `Failed to record action taken (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.code = json.error?.code;
+    err.response = json;
+    throw err;
+  }
+
+  const rawRecord = json.data?.actionTaken ?? json.data;
+  return normalizeActionTakenRecord(rawRecord);
+}
+
+export async function updateActionTakenApi(
+  ticketId: number | string,
+  actionId: number | string,
+  payload: UpdateActionTakenPayload
+): Promise<ActionTakenDTO> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const bodyPayload = {
+    ...payload,
+    actionDescription: payload.actionDescription ?? payload.description,
+    description: payload.description ?? payload.actionDescription,
+  };
+
+  const res = await fetch(
+    `${API_URL}/api/v1/tickets/${encodeURIComponent(String(ticketId))}/actions-taken/${encodeURIComponent(String(actionId))}`,
+    {
+      method: "PUT",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(bodyPayload),
+    }
+  );
+
+  const json: ApiResponse<any> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg =
+      json.error?.message || `Failed to update action taken (HTTP ${res.status})`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.code = json.error?.code;
+    err.response = json;
+    throw err;
+  }
+
+  const rawRecord = json.data?.actionTaken ?? json.data;
+  return normalizeActionTakenRecord(rawRecord);
+}

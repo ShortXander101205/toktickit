@@ -3,6 +3,7 @@ import { TicketDetail, Attachment, PublicCommentDTO } from "../types/index.js";
 import { useRequester } from "../context/RequesterContext.js";
 import { fetchTicketDetail, postPublicCommentApi, resolveTicketRequestApi } from "../api.js";
 import { AttachmentSection } from "./AttachmentSection.js";
+import { ActionsTakenSection } from "./ActionsTakenSection.js";
 
 interface RequesterTicketDetailProps {
   ticketId: number;
@@ -579,6 +580,19 @@ export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetai
         onAttachmentAdded={handleAttachmentAdded}
         onAttachmentRemoved={handleAttachmentRemoved}
       />
+
+      {/* Actions Taken Read-Only Section for Requester (Sprint 4 - Issue 19: BR-02, AC-19.4) */}
+      {(ticket.publicComments !== undefined || ticket.actionsTaken !== undefined) && (
+        <div className="mt-4">
+          <ActionsTakenSection
+            ticketId={ticket.id}
+            canEdit={false}
+            currentUser={null}
+            requesterId={currentRequester?.id}
+            initialActions={ticket.actionsTaken}
+          />
+        </div>
+      )}
 
       {/* Public Comments Discussion Section */}
       {ticket.publicComments !== undefined && (

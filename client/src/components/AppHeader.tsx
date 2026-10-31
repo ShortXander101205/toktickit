@@ -15,6 +15,22 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const activeUser = auth?.user;
+  const isAuthenticatedOrSimulated = Boolean(activeUser || currentRequester);
+  // Navigation links are hidden on Login (!isAuthenticatedOrSimulated) and on Mandatory Password Change (mustChangePassword === true)
+  const showNavigationLinks = Boolean(
+    (activeUser && !activeUser.mustChangePassword) || (!activeUser && currentRequester)
+  );
+
+  // Role-Based Navigation Flags (DEC-UI-03)
+  const isAdmin = activeUser?.role === "ADMINISTRATOR";
+  const isStaff = activeUser?.role === "IT_STAFF";
+  const isRequester =
+    activeUser?.role === "REQUESTER" || (!activeUser && Boolean(currentRequester));
+
+  const showUserManagementLink = showNavigationLinks && isAdmin;
+  const showTicketQueueLink = showNavigationLinks && (isStaff || isAdmin);
+  const showMyTicketsLink = showNavigationLinks && isRequester;
+  const showCreateTicketLink = showNavigationLinks && (isRequester || isStaff);
 
   function renderRoleBadge(role: string, isMobile = false) {
     const testId = isMobile ? "user-role-badge-mobile" : "user-role-badge";
@@ -108,63 +124,71 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           </span>
         </div>
 
-        {/* Center Desktop Nav (>= 768px) */}
-        <nav className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
-          {activeUser?.role === "ADMINISTRATOR" && (
-            <button
-              type="button"
-              className="btn btn-link text-white text-decoration-none px-2 py-1"
-              data-testid="nav-user-management"
-              style={{
-                fontWeight: currentTab === "admin-users" ? 700 : 400,
-                borderBottom: currentTab === "admin-users" ? "2px solid #ffffff" : "2px solid transparent",
-                borderRadius: 0,
-              }}
-              onClick={() => onTabChange && onTabChange("admin-users")}
-            >
-              User Management
-            </button>
-          )}
-          {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
-            <button
-              type="button"
-              className="btn btn-link text-white text-decoration-none px-2 py-1"
-              data-testid="nav-ticket-queue"
-              style={{
-                fontWeight: currentTab === "ticket-queue" ? 700 : 400,
-                borderBottom: currentTab === "ticket-queue" ? "2px solid #ffffff" : "2px solid transparent",
-                borderRadius: 0,
-              }}
-              onClick={() => onTabChange && onTabChange("ticket-queue")}
-            >
-              Ticket Queue
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-link text-white text-decoration-none px-2 py-1"
-            style={{
-              fontWeight: currentTab === "my-tickets" ? 700 : 400,
-              borderBottom: currentTab === "my-tickets" ? "2px solid #ffffff" : "2px solid transparent",
-              borderRadius: 0,
-            }}
-            onClick={() => onTabChange && onTabChange("my-tickets")}
-          >
-            My Tickets
-          </button>
-          <button
-            type="button"
-            className="btn btn-link text-white text-decoration-none px-2 py-1"
-            style={{
-              fontWeight: currentTab === "create-ticket" ? 700 : 400,
-              borderBottom: currentTab === "create-ticket" ? "2px solid #ffffff" : "2px solid transparent",
-              borderRadius: 0,
-            }}
-            onClick={() => onTabChange && onTabChange("create-ticket")}
-          >
-            + Create Ticket
-          </button>
-        </nav>
+        {/* Center Desktop Nav (>= 768px) — Hidden on Login & Mandatory Password Change screens */}
+        {showNavigationLinks && (
+          <nav className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
+            {showUserManagementLink && (
+              <button
+                type="button"
+                className="btn btn-link text-white text-decoration-none px-2 py-1"
+                data-testid="nav-user-management"
+                style={{
+                  fontWeight: currentTab === "admin-users" ? 700 : 400,
+                  borderBottom: currentTab === "admin-users" ? "2px solid #ffffff" : "2px solid transparent",
+                  borderRadius: 0,
+                }}
+                onClick={() => onTabChange && onTabChange("admin-users")}
+              >
+                User Management
+              </button>
+            )}
+            {showTicketQueueLink && (
+              <button
+                type="button"
+                className="btn btn-link text-white text-decoration-none px-2 py-1"
+                data-testid="nav-ticket-queue"
+                style={{
+                  fontWeight: currentTab === "ticket-queue" ? 700 : 400,
+                  borderBottom: currentTab === "ticket-queue" ? "2px solid #ffffff" : "2px solid transparent",
+                  borderRadius: 0,
+                }}
+                onClick={() => onTabChange && onTabChange("ticket-queue")}
+              >
+                Ticket Queue
+              </button>
+            )}
+            {showMyTicketsLink && (
+              <button
+                type="button"
+                className="btn btn-link text-white text-decoration-none px-2 py-1"
+                data-testid="nav-my-tickets"
+                style={{
+                  fontWeight: currentTab === "my-tickets" ? 700 : 400,
+                  borderBottom: currentTab === "my-tickets" ? "2px solid #ffffff" : "2px solid transparent",
+                  borderRadius: 0,
+                }}
+                onClick={() => onTabChange && onTabChange("my-tickets")}
+              >
+                My Tickets
+              </button>
+            )}
+            {showCreateTicketLink && (
+              <button
+                type="button"
+                className="btn btn-link text-white text-decoration-none px-2 py-1"
+                data-testid="nav-create-ticket"
+                style={{
+                  fontWeight: currentTab === "create-ticket" ? 700 : 400,
+                  borderBottom: currentTab === "create-ticket" ? "2px solid #ffffff" : "2px solid transparent",
+                  borderRadius: 0,
+                }}
+                onClick={() => onTabChange && onTabChange("create-ticket")}
+              >
+                + Create Ticket
+              </button>
+            )}
+          </nav>
+        )}
 
         {/* Right Desktop Persona & Auth Badge (>= 768px) */}
         <div className="d-none d-md-flex align-items-center ms-2 flex-shrink-0">
@@ -253,44 +277,46 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           )}
         </div>
 
-        {/* Right Mobile Hamburger Toggle (< 768px) */}
-        <div className="d-flex d-md-none align-items-center">
-          <button
-            type="button"
-            className="navbar-toggler btn btn-link text-white p-0 d-flex align-items-center justify-content-center"
-            aria-expanded={isMobileMenuOpen}
-            aria-label="Toggle navigation"
-            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            style={{
-              width: "44px",
-              height: "44px",
-              minWidth: "44px",
-              minHeight: "44px",
-              textDecoration: "none",
-              borderRadius: "8px",
-              backgroundColor: isMobileMenuOpen ? "rgba(255, 255, 255, 0.15)" : "transparent",
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              {isMobileMenuOpen ? (
-                <>
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </>
-              ) : (
-                <>
-                  <line x1="3" y1="12" x2="21" y2="12"></line>
-                  <line x1="3" y1="6" x2="21" y2="6"></line>
-                  <line x1="3" y1="18" x2="21" y2="18"></line>
-                </>
-              )}
-            </svg>
-          </button>
-        </div>
+        {/* Right Mobile Hamburger Toggle (< 768px) — Only shown when authenticated */}
+        {isAuthenticatedOrSimulated && (
+          <div className="d-flex d-md-none align-items-center">
+            <button
+              type="button"
+              className="navbar-toggler btn btn-link text-white p-0 d-flex align-items-center justify-content-center"
+              aria-expanded={isMobileMenuOpen}
+              aria-label="Toggle navigation"
+              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+              style={{
+                width: "44px",
+                height: "44px",
+                minWidth: "44px",
+                minHeight: "44px",
+                textDecoration: "none",
+                borderRadius: "8px",
+                backgroundColor: isMobileMenuOpen ? "rgba(255, 255, 255, 0.15)" : "transparent",
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                {isMobileMenuOpen ? (
+                  <>
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </>
+                ) : (
+                  <>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                  </>
+                )}
+              </svg>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Mobile Drawer (DEC-UI-10) */}
-      {isMobileMenuOpen && (
+      {isAuthenticatedOrSimulated && isMobileMenuOpen && (
         <nav
           className="d-flex d-md-none flex-column px-3 py-3"
           style={{
@@ -394,74 +420,82 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           ) : null}
 
           {/* Navigation Links with accessible min 44px height */}
-          <div className="d-flex flex-column gap-1">
-            {activeUser?.role === "ADMINISTRATOR" && (
-              <button
-                type="button"
-                className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
-                data-testid="nav-user-management-mobile"
-                style={{
-                  fontWeight: currentTab === "admin-users" ? 700 : 400,
-                  minHeight: "44px",
-                  backgroundColor: currentTab === "admin-users" ? "rgba(255, 255, 255, 0.15)" : "transparent",
-                }}
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onTabChange && onTabChange("admin-users");
-                }}
-              >
-                User Management
-              </button>
-            )}
-            {(activeUser?.role === "IT_STAFF" || activeUser?.role === "ADMINISTRATOR") && (
-              <button
-                type="button"
-                className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
-                data-testid="nav-ticket-queue-mobile"
-                style={{
-                  fontWeight: currentTab === "ticket-queue" ? 700 : 400,
-                  minHeight: "44px",
-                  backgroundColor: currentTab === "ticket-queue" ? "rgba(255, 255, 255, 0.15)" : "transparent",
-                }}
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  onTabChange && onTabChange("ticket-queue");
-                }}
-              >
-                Ticket Queue
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
-              style={{
-                fontWeight: currentTab === "my-tickets" ? 700 : 400,
-                minHeight: "44px",
-                backgroundColor: currentTab === "my-tickets" ? "rgba(255, 255, 255, 0.15)" : "transparent",
-              }}
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                onTabChange && onTabChange("my-tickets");
-              }}
-            >
-              My Tickets
-            </button>
-            <button
-              type="button"
-              className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
-              style={{
-                fontWeight: currentTab === "create-ticket" ? 700 : 400,
-                minHeight: "44px",
-                backgroundColor: currentTab === "create-ticket" ? "rgba(255, 255, 255, 0.15)" : "transparent",
-              }}
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                onTabChange && onTabChange("create-ticket");
-              }}
-            >
-              + Create Ticket
-            </button>
-          </div>
+          {showNavigationLinks && (
+            <div className="d-flex flex-column gap-1">
+              {showUserManagementLink && (
+                <button
+                  type="button"
+                  className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                  data-testid="nav-user-management-mobile"
+                  style={{
+                    fontWeight: currentTab === "admin-users" ? 700 : 400,
+                    minHeight: "44px",
+                    backgroundColor: currentTab === "admin-users" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                  }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onTabChange && onTabChange("admin-users");
+                  }}
+                >
+                  User Management
+                </button>
+              )}
+              {showTicketQueueLink && (
+                <button
+                  type="button"
+                  className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                  data-testid="nav-ticket-queue-mobile"
+                  style={{
+                    fontWeight: currentTab === "ticket-queue" ? 700 : 400,
+                    minHeight: "44px",
+                    backgroundColor: currentTab === "ticket-queue" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                  }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onTabChange && onTabChange("ticket-queue");
+                  }}
+                >
+                  Ticket Queue
+                </button>
+              )}
+              {showMyTicketsLink && (
+                <button
+                  type="button"
+                  className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                  data-testid="nav-my-tickets-mobile"
+                  style={{
+                    fontWeight: currentTab === "my-tickets" ? 700 : 400,
+                    minHeight: "44px",
+                    backgroundColor: currentTab === "my-tickets" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                  }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onTabChange && onTabChange("my-tickets");
+                  }}
+                >
+                  My Tickets
+                </button>
+              )}
+              {showCreateTicketLink && (
+                <button
+                  type="button"
+                  className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                  data-testid="nav-create-ticket-mobile"
+                  style={{
+                    fontWeight: currentTab === "create-ticket" ? 700 : 400,
+                    minHeight: "44px",
+                    backgroundColor: currentTab === "create-ticket" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                  }}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onTabChange && onTabChange("create-ticket");
+                  }}
+                >
+                  + Create Ticket
+                </button>
+              )}
+            </div>
+          )}
         </nav>
       )}
     </div>
