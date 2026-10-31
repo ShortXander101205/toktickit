@@ -124,6 +124,7 @@ export interface TicketDetail extends Ticket {
   removedAttachments: Attachment[];
   publicComments?: PublicCommentDTO[];
   internalNotes?: InternalNoteDTO[];
+  actionsTaken?: ActionTakenDTO[];
 }
 
 export interface AssignOwnerPayload {
@@ -269,3 +270,57 @@ export interface ResetUserPasswordPayload {
 }
 
 
+// ---------------------------------------------------------------------------
+// Issue 18 / Issue 19: Actions Taken DTOs & Payloads (Sprint 4)
+// ---------------------------------------------------------------------------
+
+export interface ActionTakenPerformerDTO {
+  id: number | string;
+  name?: string;
+  fullName?: string;
+  email?: string;
+  role: "IT_STAFF" | "ADMINISTRATOR";
+}
+
+export interface ActionTakenDTO {
+  id: number | string;
+  ticketId: number | string;
+  actionDateTime: string;
+  performedByUserId?: number | string;
+  performedBy: ActionTakenPerformerDTO;
+  description?: string;
+  actionDescription?: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActionTakenListResponseDTO {
+  items: ActionTakenDTO[];
+  totalCount: number;
+}
+
+export interface CreateActionTakenPayload {
+  actionDateTime?: string;
+  actionDescription: string;
+  description?: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+}
+
+export interface UpdateActionTakenPayload {
+  actionDateTime?: string;
+  actionDescription?: string;
+  description?: string;
+  result?: string;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+  version: number;
+}

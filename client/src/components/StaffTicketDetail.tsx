@@ -7,6 +7,7 @@ import {
   Attachment,
 } from "../types/index.js";
 import { useAuth } from "../context/AuthContext.js";
+import { ActionsTakenSection } from "./ActionsTakenSection.js";
 import {
   getTicketDetailApi,
   getStaffAssigneesApi,
@@ -665,6 +666,14 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               </div>
             )}
           </div>
+
+          {/* Actions Taken Line-Item Section (Sprint 4 - Issue 19: FR-02, BR-02, BR-03, BR-04, BR-05, BR-12) */}
+          <ActionsTakenSection
+            ticketId={ticket.id}
+            canEdit={!user || user.role === "IT_STAFF" || user.role === "ADMINISTRATOR"}
+            currentUser={user}
+            initialActions={ticket.actionsTaken}
+          />
 
           {/* Public Comments Discussion Section (BR-04, BR-08) */}
           <div
