@@ -5,6 +5,7 @@ import { uploadAttachments, uploadSingleAttachment } from "../middleware/upload.
 import { generateTicketNumber } from "../services/ticketNumber.service.js";
 import { saveAttachmentFile } from "../services/attachmentStorage.service.js";
 import { validateAttachmentFile, validateAttachmentQuantity } from "../services/attachmentValidator.js";
+import { actionsTakenRouter } from "./actionsTaken.js";
 
 export const ticketsRouter = Router();
 
@@ -1203,3 +1204,5 @@ ticketsRouter.post("/:id/attachments", uploadSingleAttachment, handleUploadTicke
 ticketsRouter.post("/:id/resolve-request", handleResolveRequest);
 ticketsRouter.post("/:id/comments", handleCreateComment);
 ticketsRouter.post("/:id/notes", handleCreateInternalNote);
+ticketsRouter.use("/:id/actions-taken", actionsTakenRouter);
+ticketsRouter.use("/:ticketId/actions-taken", actionsTakenRouter);
