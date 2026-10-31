@@ -23,8 +23,21 @@ export function ChangePassword({ onSuccess }: ChangePasswordProps) {
     const hasDigit = /[0-9]/.test(newPassword);
     const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword);
     const matchesConfirm = Boolean(newPassword && confirmPassword && newPassword === confirmPassword);
+    const isDifferentFromCurrent = Boolean(
+      newPassword && (!currentPassword || newPassword !== currentPassword)
+    );
+    const isSameAsCurrent = Boolean(
+      currentPassword && newPassword && newPassword === currentPassword
+    );
 
-    const allPassed = hasMinLength && hasUpper && hasLower && hasDigit && hasSpecial && matchesConfirm;
+    const allPassed =
+      hasMinLength &&
+      hasUpper &&
+      hasLower &&
+      hasDigit &&
+      hasSpecial &&
+      matchesConfirm &&
+      isDifferentFromCurrent;
 
     return {
       hasMinLength,
@@ -33,9 +46,11 @@ export function ChangePassword({ onSuccess }: ChangePasswordProps) {
       hasDigit,
       hasSpecial,
       matchesConfirm,
+      isDifferentFromCurrent,
+      isSameAsCurrent,
       allPassed,
     };
-  }, [newPassword, confirmPassword]);
+  }, [currentPassword, newPassword, confirmPassword]);
 
   const canSubmit = Boolean(currentPassword && checklist.allPassed && !isSubmitting);
 
@@ -61,7 +76,12 @@ export function ChangePassword({ onSuccess }: ChangePasswordProps) {
         }, 500);
       }
     } catch (err: any) {
-      const msg = err?.response?.error?.message || err?.message || "Failed to update password. Please check your current password.";
+      const fieldErr = err?.response?.error?.fieldErrors?.[0]?.message;
+      const msg =
+        fieldErr ||
+        err?.response?.error?.message ||
+        err?.message ||
+        "Failed to update password. Please check your current password.";
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
@@ -252,6 +272,25 @@ export function ChangePassword({ onSuccess }: ChangePasswordProps) {
               >
                 <span>{checklist.matchesConfirm ? "✓" : "○"}</span>
                 <span>Passwords match</span>
+              </li>
+              <li
+                data-testid="rule-different"
+                className={`d-flex align-items-center gap-2 ${
+                  checklist.isSameAsCurrent
+                    ? "text-danger fw-semibold"
+                    : checklist.isDifferentFromCurrent
+                      ? "text-success fw-semibold"
+                      : "text-muted"
+                }`}
+              >
+                <span>
+                  {checklist.isSameAsCurrent
+                    ? "✗"
+                    : checklist.isDifferentFromCurrent
+                      ? "✓"
+                      : "○"}
+                </span>
+                <span>Must be different from current password</span>
               </li>
             </ul>
           </div>
