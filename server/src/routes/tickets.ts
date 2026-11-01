@@ -5,6 +5,9 @@ import { uploadAttachments, uploadSingleAttachment } from "../middleware/upload.
 import { generateTicketNumber } from "../services/ticketNumber.service.js";
 import { saveAttachmentFile } from "../services/attachmentStorage.service.js";
 import { validateAttachmentFile, validateAttachmentQuantity } from "../services/attachmentValidator.js";
+import { authenticate, requirePasswordChanged } from "../middleware/auth.js";
+import { handleTransitionTicketStatus } from "../controllers/ticketWorkflow.controller.js";
+import { actionsTakenRouter } from "./actionsTaken.js";
 
 export const ticketsRouter = Router();
 
@@ -443,7 +446,11 @@ export async function handleGetTickets(req: Request, res: Response) {
     ...(parsedCategoryId !== undefined ? { categoryId: parsedCategoryId } : {}),
     ...(normalizedReqPriority ? { requestedPriority: parsePriorityEnum(normalizedReqPriority) } : {}),
     ...(itPriorityCondition ? itPriorityCondition : {}),
-    ...(statusFilter ? { currentStatus: parseTicketStatusEnum(statusFilter) } : {}),
+    ...(statusFilter
+      ? statusFilter.toUpperCase() === "OPEN_ACTIVE"
+        ? { currentStatus: { in: [TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_FOR_REQUESTER, TicketStatus.REOPENED] } }
+        : { currentStatus: parseTicketStatusEnum(statusFilter) }
+      : {}),
     ...(searchKeyword
       ? {
           OR: [
@@ -633,6 +640,12 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
           },
           orderBy: { createdAt: "asc" },
         },
+        actionsTaken: {
+          include: {
+            performedBy: { select: { id: true, name: true, email: true, role: true } },
+          },
+          orderBy: [{ actionDateTime: "asc" }, { id: "asc" }],
+        },
       },
     });
 
@@ -741,6 +754,9 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
         email: ticket.requester.email,
         department: ticket.requester.department,
       },
+      requesterResolvedAt: ticket.requesterResolutionConfirmedAt
+        ? ticket.requesterResolutionConfirmedAt.toISOString()
+        : null,
       requesterResolutionConfirmedAt: ticket.requesterResolutionConfirmedAt
         ? ticket.requesterResolutionConfirmedAt.toISOString()
         : null,
@@ -749,6 +765,27 @@ export async function handleGetTicketDetail(req: Request, res: Response) {
       attachments: activeAttachments,
       removedAttachments,
       publicComments: formattedPublicComments,
+      actionsTaken: ticket.actionsTaken.map((a) => ({
+        id: a.id,
+        ticketId: a.ticketId,
+        actionDateTime: a.actionDateTime.toISOString(),
+        performedAt: a.actionDateTime.toISOString(),
+        actionDescription: a.actionDescription,
+        description: a.actionDescription,
+        result: a.result,
+        followUpRequired: a.followUpRequired,
+        followUpNote: a.followUpNote,
+        attachmentNotes: a.attachmentNotes,
+        version: a.version,
+        performedBy: {
+          id: a.performedBy.id,
+          name: a.performedBy.name,
+          email: a.performedBy.email,
+          role: a.performedBy.role,
+        },
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      })),
     };
 
     // STRICT CONFIDENTIALITY INVARIANT (BR-04):
@@ -829,20 +866,40 @@ export async function handleResolveRequest(req: Request, res: Response) {
     });
   }
 
+  if (
+    ticket.currentStatus === TicketStatus.CLOSED ||
+    ticket.currentStatus === TicketStatus.CANCELLED
+  ) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_TICKET_STATE",
+        message: `Cannot record advisory resolution on a ${ticket.currentStatus} ticket.`,
+      },
+    });
+  }
+
   const now = new Date();
   const updated = await prisma.ticket.update({
     where: { id: ticketId },
     data: { requesterResolutionConfirmedAt: now },
   });
 
+  const confirmedIso = now.toISOString();
+  const payload = {
+    id: updated.id,
+    ticketNumber: updated.ticketNumber,
+    currentStatus: updated.currentStatus,
+    requesterResolvedAt: confirmedIso,
+    requesterResolutionConfirmedAt: confirmedIso,
+    updatedAt: updated.updatedAt.toISOString(),
+    message: "Problem resolution indication recorded.",
+  };
+
   return res.status(200).json({
     success: true,
-    data: {
-      id: updated.id,
-      ticketNumber: updated.ticketNumber,
-      requesterResolutionConfirmedAt: now.toISOString(),
-      message: "Problem resolution indication recorded.",
-    },
+    ...payload,
+    data: payload,
   });
 }
 
@@ -1199,7 +1256,11 @@ export async function handleUploadTicketAttachment(req: Request, res: Response) 
 ticketsRouter.get("/", handleGetTickets);
 ticketsRouter.post("/", uploadAttachments, handleCreateTicket);
 ticketsRouter.get("/:id", handleGetTicketDetail);
+ticketsRouter.patch("/:id/status", authenticate, requirePasswordChanged, handleTransitionTicketStatus);
 ticketsRouter.post("/:id/attachments", uploadSingleAttachment, handleUploadTicketAttachment);
 ticketsRouter.post("/:id/resolve-request", handleResolveRequest);
+ticketsRouter.post("/:id/confirm-resolution", handleResolveRequest);
 ticketsRouter.post("/:id/comments", handleCreateComment);
 ticketsRouter.post("/:id/notes", handleCreateInternalNote);
+ticketsRouter.use("/:id/actions-taken", actionsTakenRouter);
+ticketsRouter.use("/:ticketId/actions-taken", actionsTakenRouter);

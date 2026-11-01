@@ -7,11 +7,19 @@ import {
   TicketStatus,
 } from "../types/index.js";
 
-interface StaffTicketQueueProps {
+export interface StaffTicketQueueProps {
   onSelectTicket?: (ticketId: number) => void;
+  initialStatusFilter?: string;
+  initialOwnerFilter?: string;
+  autoFocusSearch?: boolean;
 }
 
-export function StaffTicketQueue({ onSelectTicket }: StaffTicketQueueProps) {
+export function StaffTicketQueue({
+  onSelectTicket,
+  initialStatusFilter,
+  initialOwnerFilter,
+  autoFocusSearch,
+}: StaffTicketQueueProps) {
   // Data states
   const [tickets, setTickets] = useState<StaffTicketSummaryDTO[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -23,10 +31,31 @@ export function StaffTicketQueue({ onSelectTicket }: StaffTicketQueueProps) {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Filter dropdown states
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState(initialStatusFilter ?? "");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedPriority, setSelectedPriority] = useState("");
-  const [selectedOwner, setSelectedOwner] = useState("");
+  const [selectedOwner, setSelectedOwner] = useState(initialOwnerFilter ?? "");
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (initialStatusFilter !== undefined) {
+      setSelectedStatus(initialStatusFilter);
+      setCurrentPage(1);
+    }
+  }, [initialStatusFilter]);
+
+  useEffect(() => {
+    if (initialOwnerFilter !== undefined) {
+      setSelectedOwner(initialOwnerFilter);
+      setCurrentPage(1);
+    }
+  }, [initialOwnerFilter]);
+
+  useEffect(() => {
+    if (autoFocusSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [autoFocusSearch]);
 
   // Sort states
   const [sortBy, setSortBy] = useState<string>("createdAt");
@@ -375,6 +404,7 @@ export function StaffTicketQueue({ onSelectTicket }: StaffTicketQueueProps) {
                 </svg>
               </span>
               <input
+                ref={searchInputRef}
                 id="queue-search"
                 type="text"
                 className="form-control border-start-0 ps-0"
@@ -489,6 +519,13 @@ export function StaffTicketQueue({ onSelectTicket }: StaffTicketQueueProps) {
             >
               <option value="">All Owners</option>
               <option value="unassigned">Unassigned Only</option>
+              {selectedOwner &&
+                selectedOwner !== "unassigned" &&
+                !["Sompong IT", "Wichai Support", "Anong Network"].includes(selectedOwner) && (
+                  <option value={selectedOwner}>
+                    {isNaN(Number(selectedOwner)) ? selectedOwner : `Assigned Staff (ID #${selectedOwner})`}
+                  </option>
+                )}
               <option value="Sompong IT">Sompong IT</option>
               <option value="Wichai Support">Wichai Support</option>
               <option value="Anong Network">Anong Network</option>

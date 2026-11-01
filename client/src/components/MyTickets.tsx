@@ -3,12 +3,27 @@ import { useRequester } from "../context/RequesterContext.js";
 import { fetchTickets, fetchCategories, Category } from "../api.js";
 import { Ticket } from "../types/index.js";
 
-interface MyTicketsProps {
+export interface MyTicketsProps {
   onCreateTicket?: () => void;
   onSelectTicket?: (ticketId: number) => void;
+  initialStatusFilter?: string;
 }
 
-export function MyTickets({ onCreateTicket, onSelectTicket }: MyTicketsProps) {
+function normalizeStatusFilterValue(status?: string): string {
+  if (!status) return "";
+  const norm = status.toUpperCase().replace(/\s+/g, "_");
+  if (norm === "OPEN_ACTIVE") return "OPEN_ACTIVE";
+  if (norm === "NEW") return "New";
+  if (norm === "OPEN" || norm === "ASSIGNED") return "Assigned";
+  if (norm === "IN_PROGRESS") return "In Progress";
+  if (norm === "WAITING_FOR_REQUESTER" || norm === "PENDING_REQUESTER") return "Pending Requester";
+  if (norm === "RESOLVED") return "Resolved";
+  if (norm === "CLOSED") return "Closed";
+  if (norm === "CANCELLED") return "Cancelled";
+  return status;
+}
+
+export function MyTickets({ onCreateTicket, onSelectTicket, initialStatusFilter }: MyTicketsProps) {
   const { currentRequester } = useRequester();
 
   // Data states
@@ -25,7 +40,14 @@ export function MyTickets({ onCreateTicket, onSelectTicket }: MyTicketsProps) {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedReqPriority, setSelectedReqPriority] = useState("");
   const [selectedItPriority, setSelectedItPriority] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState(() => normalizeStatusFilterValue(initialStatusFilter));
+
+  useEffect(() => {
+    if (initialStatusFilter !== undefined) {
+      setSelectedStatus(normalizeStatusFilterValue(initialStatusFilter));
+      setCurrentPage(1);
+    }
+  }, [initialStatusFilter]);
 
   // Sort states
   const [sortBy, setSortBy] = useState<"ticketNumber" | "createdAt" | "currentStatus" | "updatedAt">("createdAt");
@@ -457,8 +479,10 @@ export function MyTickets({ onCreateTicket, onSelectTicket }: MyTicketsProps) {
               }}
               style={{ height: "38px", fontSize: "0.875rem" }}
               aria-label="Filter by Status"
+              data-testid="requester-filter-status"
             >
               <option value="">All Statuses</option>
+              <option value="OPEN_ACTIVE">All Open Tickets</option>
               <option value="New">New</option>
               <option value="Assigned">Assigned</option>
               <option value="In Progress">In Progress</option>

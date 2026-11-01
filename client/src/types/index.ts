@@ -119,11 +119,15 @@ export interface TicketDetail extends Ticket {
   owner?: StaffTicketOwnerDTO | null;
   ticketOwner?: string | null;
   resolutionSummary?: string | null;
+  requesterResolvedAt?: string | null;
   requesterResolutionConfirmedAt?: string | null;
+  resolvedAt?: string | null;
+  closedAt?: string | null;
   attachments: Attachment[];
   removedAttachments: Attachment[];
   publicComments?: PublicCommentDTO[];
   internalNotes?: InternalNoteDTO[];
+  actionsTaken?: ActionTakenDTO[];
 }
 
 export interface AssignOwnerPayload {
@@ -135,7 +139,9 @@ export interface UpdatePriorityPayload {
 }
 
 export interface TransitionStatusPayload {
-  targetStatus: TicketStatus | string;
+  targetStatus?: TicketStatus | string;
+  status?: TicketStatus | string;
+  updatedAt?: string;
 }
 
 export interface CreateCommentPayload {
@@ -269,3 +275,185 @@ export interface ResetUserPasswordPayload {
 }
 
 
+// ---------------------------------------------------------------------------
+// Issue 18 / Issue 19: Actions Taken DTOs & Payloads (Sprint 4)
+// ---------------------------------------------------------------------------
+
+export interface ActionTakenPerformerDTO {
+  id: number | string;
+  name?: string;
+  fullName?: string;
+  email?: string;
+  role: "IT_STAFF" | "ADMINISTRATOR";
+}
+
+export interface ActionTakenDTO {
+  id: number | string;
+  ticketId: number | string;
+  actionDateTime: string;
+  performedByUserId?: number | string;
+  performedBy: ActionTakenPerformerDTO;
+  description?: string;
+  actionDescription?: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote: string | null;
+  attachmentNotes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActionTakenListResponseDTO {
+  items: ActionTakenDTO[];
+  totalCount: number;
+}
+
+export interface CreateActionTakenPayload {
+  actionDateTime?: string;
+  actionDescription: string;
+  description?: string;
+  result: string;
+  followUpRequired: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+}
+
+export interface UpdateActionTakenPayload {
+  actionDateTime?: string;
+  actionDescription?: string;
+  description?: string;
+  result?: string;
+  followUpRequired?: boolean;
+  followUpNote?: string | null;
+  attachmentNotes?: string | null;
+  version: number;
+}
+
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Issue 21 Dashboard Contracts
+// ---------------------------------------------------------------------------
+
+export interface DashboardRecentTicketDTO {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  title: string;
+  categoryId: number;
+  categoryName: string;
+  category?: {
+    id: number;
+    name: string;
+    code?: string | null;
+  };
+  requestedPriority: string;
+  itPriority?: string | null;
+  priority: string;
+  currentStatus: string;
+  status: string;
+  ownerId?: number | null;
+  ownerName?: string | null;
+  owner?: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
+  requesterId: number;
+  requesterName?: string;
+  requester?: {
+    id: number;
+    name: string;
+    email: string;
+    department?: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequesterDashboardMetricsDTO {
+  totalOpen: number;
+  waitingForRequester: number;
+  inProgress: number;
+  resolved: number;
+  closed: number;
+  metrics?: {
+    totalOpen: number;
+    waitingForRequester: number;
+    inProgress: number;
+    resolved: number;
+    closed: number;
+    totalOpenTickets: number;
+    waitingForRequesterTickets: number;
+    inProgressTickets: number;
+    recentlyResolvedTickets: number;
+    resolvedTickets: number;
+    closedTickets: number;
+  };
+  recentTickets: DashboardRecentTicketDTO[];
+}
+
+export interface StaffDashboardMetricsDTO {
+  newCount: number;
+  openCount: number;
+  inProgressCount: number;
+  waitingForRequesterCount: number;
+  myAssignedCount: number;
+  unassignedCount: number;
+  resolvedCount: number;
+  closedCount: number;
+  reopenedCount: number;
+  cancelledCount: number;
+  urgentAttentionCount: number;
+  statusBreakdown: Record<string, number>;
+  priorityBreakdown: Record<string, number>;
+  metrics?: {
+    newCount: number;
+    openCount: number;
+    inProgressCount: number;
+    waitingForRequesterCount: number;
+    myAssignedCount: number;
+    unassignedCount: number;
+    resolvedCount: number;
+    closedCount: number;
+    reopenedCount: number;
+    cancelledCount: number;
+    urgentAttentionCount: number;
+    statusBreakdown: Record<string, number>;
+    priorityBreakdown: Record<string, number>;
+  };
+  recentTickets: DashboardRecentTicketDTO[];
+}
+
+export interface AdminUserMetricsDTO {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  activeUsersCount?: number;
+  inactiveUsersCount?: number;
+  requestersCount: number;
+  staffCount: number;
+  adminCount: number;
+  usersByRole?: {
+    REQUESTER: number;
+    IT_STAFF: number;
+    ADMINISTRATOR: number;
+  };
+}
+
+export interface AdminDashboardMetricsDTO extends StaffDashboardMetricsDTO {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  requestersCount: number;
+  staffCount: number;
+  adminCount: number;
+  users?: AdminUserMetricsDTO;
+  operationalMetrics?: StaffDashboardMetricsDTO["metrics"];
+}
+
+export type RequesterDashboardResponse = RequesterDashboardMetricsDTO;
+export type StaffDashboardResponse = StaffDashboardMetricsDTO;
+export type AdminDashboardResponse = AdminDashboardMetricsDTO;
+export type DashboardRecentTicket = DashboardRecentTicketDTO;

@@ -5,8 +5,10 @@ import {
   PublicCommentDTO,
   InternalNoteDTO,
   Attachment,
+  ActionTakenDTO,
 } from "../types/index.js";
 import { useAuth } from "../context/AuthContext.js";
+import { ActionsTakenSection } from "./ActionsTakenSection.js";
 import {
   getTicketDetailApi,
   getStaffAssigneesApi,
@@ -15,6 +17,7 @@ import {
   transitionTicketStatusApi,
   postPublicCommentApi,
   postInternalNoteApi,
+  setTicketUpdatedAtToken,
 } from "../api.js";
 
 interface StaffTicketDetailProps {
@@ -22,16 +25,16 @@ interface StaffTicketDetailProps {
   onBack: () => void;
 }
 
-// Status Transition Matrix validator (SDS Approved Decision D-02 / Spec §6.1)
-const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+// Authoritative Status Transition Matrix (BR-06, SDS §4.2, Issue 20 Contract §2)
+export const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
   NEW: ["OPEN", "IN_PROGRESS", "CANCELLED"],
   OPEN: ["IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"],
   IN_PROGRESS: ["WAITING_FOR_REQUESTER", "RESOLVED", "CANCELLED"],
   WAITING_FOR_REQUESTER: ["IN_PROGRESS", "RESOLVED", "CANCELLED"],
-  RESOLVED: ["CLOSED", "REOPENED", "CANCELLED"],
-  CLOSED: ["REOPENED"],
-  REOPENED: ["OPEN", "IN_PROGRESS", "CANCELLED"],
-  CANCELLED: ["REOPENED"],
+  RESOLVED: ["CLOSED", "REOPENED"],
+  CLOSED: [],
+  REOPENED: ["IN_PROGRESS", "RESOLVED", "CANCELLED"],
+  CANCELLED: [],
 };
 
 function normalizeStatusKey(val: string): string {
@@ -230,6 +233,22 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
   const [isUpdatingPriority, setIsUpdatingPriority] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusToConfirm, setStatusToConfirm] = useState<string | null>(null);
+
+  // WCAG 2.1.2: Modal Escape Key Dismissal
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && statusToConfirm) {
+        setStatusToConfirm(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [statusToConfirm]);
+  const [actionsList, setActionsList] = useState<ActionTakenDTO[]>([]);
+  const [statusConflict, setStatusConflict] = useState<string | null>(null);
+  const [resolutionGateError, setResolutionGateError] = useState<string | null>(null);
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(null);
+  const [isRefreshingTicket, setIsRefreshingTicket] = useState(false);
   const [feedbackNotice, setFeedbackNotice] = useState<{ type: "success" | "danger"; message: string } | null>(null);
 
   // Discussion Threads
@@ -257,6 +276,8 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
         ]);
         if (isMounted) {
           setTicket(ticketData);
+          setActionsList(ticketData.actionsTaken || []);
+          setTicketUpdatedAtToken(ticketData.id, ticketData.updatedAt);
           setAssignees(assigneesData);
         }
       } catch (err: any) {
@@ -278,6 +299,34 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
     };
   }, [ticketId]);
 
+  useEffect(() => {
+    if (ticket?.id && ticket?.updatedAt) {
+      setTicketUpdatedAtToken(ticket.id, ticket.updatedAt);
+    }
+  }, [ticket?.id, ticket?.updatedAt]);
+
+  async function handleRefreshTicketState() {
+    if (!ticket) return;
+    setIsRefreshingTicket(true);
+    try {
+      const latestTicket = await getTicketDetailApi(ticket.id);
+      setTicket(latestTicket);
+      if (latestTicket.actionsTaken) {
+        setActionsList(latestTicket.actionsTaken);
+      }
+      setTicketUpdatedAtToken(latestTicket.id, latestTicket.updatedAt);
+      setStatusConflict(null);
+      setStatusUpdateError(null);
+      setResolutionGateError(null);
+      setStatusToConfirm(null);
+      showFeedback("success", "Ticket state refreshed with the latest changes.");
+    } catch (err: any) {
+      showFeedback("danger", err.message || "Failed to refresh ticket state.");
+    } finally {
+      setIsRefreshingTicket(false);
+    }
+  }
+
   function showFeedback(type: "success" | "danger", message: string) {
     setFeedbackNotice({ type, message });
     setTimeout(() => {
@@ -291,6 +340,9 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
     setIsUpdatingOwner(true);
     try {
       const res = await assignTicketOwnerApi(ticket.id, user.id);
+      if (res?.updatedAt) {
+        setTicketUpdatedAtToken(ticket.id, res.updatedAt);
+      }
       setTicket((prev) =>
         prev
           ? {
@@ -302,6 +354,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
                 email: user.email,
               },
               ticketOwner: user.name,
+              updatedAt: res?.updatedAt || prev.updatedAt,
             }
           : null
       );
@@ -322,6 +375,9 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
     setIsUpdatingOwner(true);
     try {
       const res = await assignTicketOwnerApi(ticket.id, targetOwnerId);
+      if (res?.updatedAt) {
+        setTicketUpdatedAtToken(ticket.id, res.updatedAt);
+      }
       const newOwner = assignees.find((a) => a.id === targetOwnerId) || null;
       setTicket((prev) =>
         prev
@@ -330,6 +386,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               ownerId: targetOwnerId,
               owner: newOwner,
               ticketOwner: newOwner?.name || null,
+              updatedAt: res?.updatedAt || prev.updatedAt,
             }
           : null
       );
@@ -359,19 +416,53 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
     }
   }
 
-  // Transition Status (Enforces Status Transition Matrix)
+  // Transition Status (Enforces BR-06 Transition Matrix, BR-07 Resolution Gate, BR-09 Concurrency)
   async function handleConfirmStatusTransition() {
     if (!ticket || !statusToConfirm) return;
 
     setIsUpdatingStatus(true);
+    setStatusConflict(null);
+    setStatusUpdateError(null);
+    setResolutionGateError(null);
+
     try {
       const res = await transitionTicketStatusApi(ticket.id, statusToConfirm);
       const updatedStatus = res?.currentStatus || statusToConfirm;
-      setTicket((prev) => (prev ? { ...prev, currentStatus: updatedStatus } : null));
+      const updatedTimestamp = res?.updatedAt || new Date().toISOString();
+      setTicketUpdatedAtToken(ticket.id, updatedTimestamp);
+      setTicket((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentStatus: updatedStatus,
+              updatedAt: updatedTimestamp,
+              resolvedAt: res?.resolvedAt ?? prev.resolvedAt,
+              closedAt: res?.closedAt ?? prev.closedAt,
+            }
+          : null
+      );
       showFeedback("success", `Status transitioned to ${updatedStatus}.`);
       setStatusToConfirm(null);
     } catch (err: any) {
-      showFeedback("danger", err.message || "Failed to transition status.");
+      const msg = err?.message || "Failed to transition status.";
+      if (
+        err?.status === 409 ||
+        err?.code === "CONFLICT" ||
+        /conflict|modified by another/i.test(msg)
+      ) {
+        setStatusConflict(
+          "Conflict (409): This ticket was updated by another session. Refresh ticket state to load the latest changes."
+        );
+      } else if (
+        err?.status === 400 &&
+        /action taken/i.test(msg)
+      ) {
+        setResolutionGateError(msg);
+        setStatusUpdateError(msg);
+      } else {
+        setStatusUpdateError(msg);
+        showFeedback("danger", msg);
+      }
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -486,9 +577,48 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
   const currentStatusNorm = normalizeStatusKey(ticket.currentStatus);
   const allowedTransitions = ALLOWED_STATUS_TRANSITIONS[currentStatusNorm] || [];
   const isClaimedByMe = Boolean(user && ticket.ownerId === user.id);
+  const effectiveActionsCount = Math.max(
+    actionsList.length,
+    ticket.actionsTaken?.length ?? 0
+  );
+  const requesterConfirmedTimestamp =
+    ticket.requesterResolvedAt || ticket.requesterResolutionConfirmedAt;
 
   return (
     <div className="staff-ticket-detail-view pb-5">
+      {/* Non-Destructive 409 Conflict Banner (BR-09, D-13) */}
+      {statusConflict && (
+        <div
+          className="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 shadow-sm py-2.5 px-3"
+          role="alert"
+          data-testid="status-conflict-banner"
+          style={{
+            borderRadius: "8px",
+            border: "1px solid #F59E0B",
+            backgroundColor: "#FFFBEB",
+            color: "#92400E",
+          }}
+        >
+          <div className="small fw-medium">
+            <strong>⚠️ Concurrent Update Detected:</strong> {statusConflict}
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm fw-semibold"
+            data-testid="refresh-ticket-state-btn"
+            style={{
+              backgroundColor: "var(--color-primary-green, #006B3C)",
+              color: "#FFFFFF",
+              borderRadius: "6px",
+            }}
+            disabled={isRefreshingTicket}
+            onClick={handleRefreshTicketState}
+          >
+            {isRefreshingTicket ? "Refreshing..." : "Refresh Ticket State"}
+          </button>
+        </div>
+      )}
+
       {/* Feedback Toast Notice */}
       {feedbackNotice && (
         <div
@@ -515,7 +645,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
         >
           ← Back to Ticket Queue
         </button>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2" data-testid="header-status-badge">
           {renderStatusBadge(ticket.currentStatus)}
         </div>
       </div>
@@ -561,10 +691,11 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               </div>
             </div>
 
-            {/* Requester Resolution Status Indication (BR-05) */}
-            {ticket.requesterResolutionConfirmedAt && (
+            {/* Requester Resolution Status Indication (BR-08) */}
+            {requesterConfirmedTimestamp && (
               <div
                 className="alert d-flex align-items-center gap-2 mb-3 py-2.5 px-3"
+                data-testid="requester-resolved-advisory"
                 style={{
                   borderRadius: "8px",
                   border: "1px solid #A7F3D0",
@@ -578,7 +709,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
                 </svg>
                 <div className="small">
                   <strong>Requester Confirmed Resolution:</strong> The requester reported that this problem appears resolved on{" "}
-                  {formatDate(ticket.requesterResolutionConfirmedAt)}. Verify and transition to Closed when completed.
+                  {formatDate(requesterConfirmedTimestamp)}. Verify and transition to Closed when completed.
                 </div>
               </div>
             )}
@@ -665,6 +796,22 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               </div>
             )}
           </div>
+
+          {/* Actions Taken Line-Item Section (Sprint 4 - Issue 19: FR-02, BR-02, BR-03, BR-04, BR-05, BR-12) */}
+          <ActionsTakenSection
+            ticketId={ticket.id}
+            canEdit={!user || user.role === "IT_STAFF" || user.role === "ADMINISTRATOR"}
+            currentUser={user}
+            initialActions={ticket.actionsTaken}
+            onActionsUpdated={(updated) => {
+              setActionsList(updated);
+              setTicket((prev) => (prev ? { ...prev, actionsTaken: updated } : null));
+              if (updated.length > 0) {
+                setResolutionGateError(null);
+                setStatusUpdateError(null);
+              }
+            }}
+          />
 
           {/* Public Comments Discussion Section (BR-04, BR-08) */}
           <div
@@ -953,7 +1100,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               </div>
             </div>
 
-            {/* 3. Status Transition Workflow (Status Transition Matrix Engine) */}
+            {/* 3. Status Transition Workflow (BR-06, BR-07, BR-09) */}
             <div className="pt-3 border-top">
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <span className="fw-semibold small text-muted">Current Status:</span>
@@ -961,8 +1108,27 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               </div>
 
               {allowedTransitions.length === 0 ? (
-                <div className="alert alert-secondary py-2 px-3 small text-center mb-0">
-                  No further status transitions permitted.
+                <div>
+                  <label htmlFor="staff-status-select" className="form-label fw-semibold small mb-1 text-muted">
+                    Transition Workflow Status
+                  </label>
+                  <select
+                    id="staff-status-select"
+                    data-testid="status-select"
+                    className="form-select form-select-sm mb-2"
+                    value={currentStatusNorm}
+                    disabled
+                  >
+                    <option value={currentStatusNorm}>
+                      {currentStatusNorm.replace(/_/g, " ")} (Terminal)
+                    </option>
+                  </select>
+                  <div
+                    className="alert alert-secondary py-2 px-3 small text-center mb-0"
+                    data-testid="terminal-status-notice"
+                  >
+                    No further status transitions permitted ({currentStatusNorm} is a terminal status).
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -971,9 +1137,17 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
                   </label>
                   <select
                     id="staff-status-select"
+                    data-testid="status-select"
                     className="form-select form-select-sm mb-2"
                     value={statusToConfirm || ""}
-                    onChange={(e) => setStatusToConfirm(e.target.value || null)}
+                    onChange={(e) => {
+                      const val = e.target.value || null;
+                      setStatusToConfirm(val);
+                      setStatusUpdateError(null);
+                      if (val !== "RESOLVED") {
+                        setResolutionGateError(null);
+                      }
+                    }}
                     disabled={isUpdatingStatus}
                   >
                     <option value="">— Select Target Status —</option>
@@ -984,8 +1158,40 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
                     ))}
                   </select>
 
+                  {/* Resolution Gate Blocker Guidance Alert (BR-07, D-12) */}
+                  {((statusToConfirm === "RESOLVED" && effectiveActionsCount === 0) ||
+                    resolutionGateError) && (
+                    <div
+                      className="alert alert-warning py-2 px-2.5 small mb-2"
+                      role="alert"
+                      data-testid="resolution-gate-alert"
+                      style={{
+                        borderRadius: "6px",
+                        border: "1px solid #FCD34D",
+                        backgroundColor: "#FFFBEB",
+                        color: "#92400E",
+                        fontSize: "0.78rem",
+                      }}
+                    >
+                      <strong>Resolution Gate:</strong>{" "}
+                      {resolutionGateError ||
+                        "Cannot resolve ticket without at least one recorded Action Taken. Please log an action in the Actions Taken section first."}
+                    </div>
+                  )}
+
+                  {statusUpdateError && !resolutionGateError && (
+                    <div
+                      className="alert alert-danger py-2 px-2.5 small mb-2"
+                      role="alert"
+                      data-testid="status-update-error"
+                    >
+                      {statusUpdateError}
+                    </div>
+                  )}
+
                   <button
                     type="button"
+                    data-testid="update-status-btn"
                     className="btn btn-outline-success btn-sm w-100 fw-semibold"
                     disabled={!statusToConfirm || isUpdatingStatus}
                     onClick={handleConfirmStatusTransition}

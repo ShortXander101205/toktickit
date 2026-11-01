@@ -63,6 +63,7 @@ model User {
   removedAttachments Attachment[]    @relation("UserRemovedAttachments")
   publicComments     PublicComment[]
   internalNotes      InternalNote[]
+  actionsTaken       ActionTaken[]   @relation("StaffActionsTaken")
 
   @@map("users")
 }
@@ -117,6 +118,7 @@ model Ticket {
   itPriority                     Priority?
   currentStatus                  TicketStatus    @default(NEW)
   requesterResolutionConfirmedAt DateTime?
+  version                        Int             @default(1)
   createdAt                      DateTime        @default(now())
   updatedAt                      DateTime        @updatedAt
 
@@ -128,6 +130,7 @@ model Ticket {
   attachments       Attachment[]
   publicComments    PublicComment[]
   internalNotes     InternalNote[]
+  actionsTaken      ActionTaken[]
 
   @@index([requesterId])
   @@index([ownerId])
@@ -135,6 +138,9 @@ model Ticket {
   @@index([itPriority])
   @@index([categoryId])
   @@index([createdAt])
+  @@index([requesterId, currentStatus, updatedAt])
+  @@index([ownerId, currentStatus, updatedAt])
+  @@index([currentStatus, itPriority])
   @@map("tickets")
 }
 
@@ -207,4 +213,29 @@ model InternalNote {
   @@index([ticketId])
   @@index([authorId])
   @@map("internal_notes")
+}
+
+// ---------------------------------------------------------------------------
+// 9. Action Taken (Parent-Child Work Tracking by IT Staff - BR-01..BR-05)
+// ---------------------------------------------------------------------------
+model ActionTaken {
+  id                Int      @id @default(autoincrement())
+  ticketId          Int
+  performedById     Int
+  actionDateTime    DateTime @default(now())
+  actionDescription String   @db.Text
+  result            String   @db.Text
+  followUpRequired  Boolean  @default(false)
+  followUpNote      String?  @db.Text
+  attachmentNotes   String?  @db.VarChar(255)
+  version           Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  ticket      Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  performedBy User   @relation("StaffActionsTaken", fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, actionDateTime])
+  @@index([performedById])
+  @@map("actions_taken")
 }

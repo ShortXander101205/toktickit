@@ -13,7 +13,32 @@ describe("Issue 15: Administrator User Management & Account Safety API", () => {
   let itStaffToken: string;
   let requesterToken: string;
 
+  const TEST_EMAILS_TO_CLEAN = [
+    "newuser@kmutt.ac.th",
+    "new.requester@kmutt.ac.th",
+    "duplicate.test@kmutt.ac.th",
+    "duplicate.case@kmutt.ac.th",
+    "user.to.update@kmutt.ac.th",
+    "second.admin@kmutt.ac.th",
+    "reset.target@kmutt.ac.th",
+    "valid.email@kmutt.ac.th",
+    "valid.role@kmutt.ac.th",
+    "admin.dash@kmutt.ac.th",
+    "staff.dash1@kmutt.ac.th",
+    "staff.dash2@kmutt.ac.th",
+    "req.dash@kmutt.ac.th",
+  ];
+
   beforeAll(async () => {
+    // Clean up any test users created by previous runs to ensure test isolation
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: TEST_EMAILS_TO_CLEAN,
+        },
+      },
+    });
+
     // Ensure primary admin has mustChangePassword = false so it can operate admin APIs
     const admin = await prisma.user.update({
       where: { email: "admin@kmutt.ac.th" },
@@ -460,5 +485,15 @@ describe("Issue 15: Administrator User Management & Account Safety API", () => {
 
     expect(queueRes.status).toBe(403);
     expect(queueRes.body.error.code).toBe("PASSWORD_CHANGE_REQUIRED");
+  });
+
+  afterAll(async () => {
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: TEST_EMAILS_TO_CLEAN,
+        },
+      },
+    });
   });
 });
