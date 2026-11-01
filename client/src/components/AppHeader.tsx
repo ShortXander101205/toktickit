@@ -89,7 +89,8 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
   return (
     <div className="w-100" style={{ zIndex: 1030 }}>
-      <header
+      <a href="#main-content" className="skip-link visually-hidden-focusable">Skip to main content</a>
+      <header role="banner"
         className="d-flex align-items-center justify-content-between px-3 px-md-4"
         style={{
           backgroundColor: "var(--color-primary-green)",
@@ -128,7 +129,7 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
 
         {/* Center Desktop Nav (>= 768px) — Hidden on Login & Mandatory Password Change screens */}
         {showNavigationLinks && (
-          <nav className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
+          <nav aria-label="Main Navigation" className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
             <button
               type="button"
               className="btn btn-link text-white text-decoration-none px-2 py-1"

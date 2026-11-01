@@ -233,6 +233,17 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
   const [isUpdatingPriority, setIsUpdatingPriority] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusToConfirm, setStatusToConfirm] = useState<string | null>(null);
+
+  // WCAG 2.1.2: Modal Escape Key Dismissal
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && statusToConfirm) {
+        setStatusToConfirm(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [statusToConfirm]);
   const [actionsList, setActionsList] = useState<ActionTakenDTO[]>([]);
   const [statusConflict, setStatusConflict] = useState<string | null>(null);
   const [resolutionGateError, setResolutionGateError] = useState<string | null>(null);
@@ -329,6 +340,9 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
     setIsUpdatingOwner(true);
     try {
       const res = await assignTicketOwnerApi(ticket.id, user.id);
+      if (res?.updatedAt) {
+        setTicketUpdatedAtToken(ticket.id, res.updatedAt);
+      }
       setTicket((prev) =>
         prev
           ? {
@@ -340,6 +354,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
                 email: user.email,
               },
               ticketOwner: user.name,
+              updatedAt: res?.updatedAt || prev.updatedAt,
             }
           : null
       );
@@ -360,6 +375,9 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
     setIsUpdatingOwner(true);
     try {
       const res = await assignTicketOwnerApi(ticket.id, targetOwnerId);
+      if (res?.updatedAt) {
+        setTicketUpdatedAtToken(ticket.id, res.updatedAt);
+      }
       const newOwner = assignees.find((a) => a.id === targetOwnerId) || null;
       setTicket((prev) =>
         prev
@@ -368,6 +386,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
               ownerId: targetOwnerId,
               owner: newOwner,
               ticketOwner: newOwner?.name || null,
+              updatedAt: res?.updatedAt || prev.updatedAt,
             }
           : null
       );
@@ -626,7 +645,7 @@ export function StaffTicketDetail({ ticketId, onBack }: StaffTicketDetailProps) 
         >
           ← Back to Ticket Queue
         </button>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2" data-testid="header-status-badge">
           {renderStatusBadge(ticket.currentStatus)}
         </div>
       </div>
