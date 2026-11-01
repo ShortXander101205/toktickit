@@ -58,6 +58,7 @@ export function isTransitionAllowed(from: TicketStatus, to: TicketStatus): boole
  */
 staffRouter.get("/tickets", async (req: Request, res: Response): Promise<void> => {
   try {
+    const prisma = getPrisma();
     const {
       search,
       status,
@@ -121,20 +122,29 @@ staffRouter.get("/tickets", async (req: Request, res: Response): Promise<void> =
       }
     }
 
-    // 5. Owner Filter (unassigned vs specific user ID)
-    if (typeof owner === "string" && owner.trim()) {
-      const ownerVal = owner.trim();
-      if (ownerVal.toLowerCase() === "unassigned") {
+    // 5. Owner Filter (unassigned vs specific user ID or name)
+    const rawOwner = (typeof owner === "string" ? owner : typeof req.query.ownerId === "string" ? req.query.ownerId : "").trim();
+    if (rawOwner) {
+      if (rawOwner.toLowerCase() === "unassigned") {
         where.ownerId = null;
       } else {
-        const ownerId = Number(ownerVal);
-        if (isNaN(ownerId) || ownerId <= 0) {
-          fieldErrors.push({
-            field: "owner",
-            message: "Owner must be 'unassigned' or a positive integer user ID.",
-          });
-        } else {
+        const ownerId = Number(rawOwner);
+        if (!isNaN(ownerId) && ownerId > 0) {
           where.ownerId = ownerId;
+        } else {
+          const matchedUser = await prisma.user.findFirst({
+            where: {
+              name: { equals: rawOwner, mode: "insensitive" },
+            },
+          });
+          if (matchedUser) {
+            where.ownerId = matchedUser.id;
+          } else {
+            fieldErrors.push({
+              field: "owner",
+              message: "Owner must be 'unassigned', a staff user's name, or a positive integer user ID.",
+            });
+          }
         }
       }
     }
@@ -184,7 +194,6 @@ staffRouter.get("/tickets", async (req: Request, res: Response): Promise<void> =
     const take = parsedPageSize;
 
     // 8. Execute Database Query
-    const prisma = getPrisma();
     const [totalCount, tickets] = await prisma.$transaction([
       prisma.ticket.count({ where }),
       prisma.ticket.findMany({

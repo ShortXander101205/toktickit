@@ -24,7 +24,16 @@ import {
   ActionTakenListResponseDTO,
   CreateActionTakenPayload,
   UpdateActionTakenPayload,
+  RequesterDashboardResponse,
+  StaffDashboardResponse,
+  AdminDashboardResponse,
 } from "./types/index.js";
+
+export type {
+  RequesterDashboardResponse,
+  StaffDashboardResponse,
+  AdminDashboardResponse,
+};
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -1232,3 +1241,112 @@ export async function updateActionTakenApi(
   const rawRecord = json.data?.actionTaken ?? json.data;
   return normalizeActionTakenRecord(rawRecord);
 }
+
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Issue 21 Dashboard APIs (Requester, IT Staff & Admin)
+// ---------------------------------------------------------------------------
+
+export async function fetchRequesterDashboard(activeRequesterId?: number): Promise<RequesterDashboardResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (activeRequesterId) {
+    headers["x-requester-id"] = String(activeRequesterId);
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/dashboards/requester`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<RequesterDashboardResponse> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch requester dashboard: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function fetchStaffDashboard(): Promise<StaffDashboardResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/dashboards/staff`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<StaffDashboardResponse> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch staff dashboard: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+export async function fetchAdminDashboard(): Promise<AdminDashboardResponse> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}/api/v1/dashboards/admin`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<AdminDashboardResponse> = await res.json().catch(() => ({
+    success: false,
+    error: {
+      code: "PARSE_ERROR",
+      message: `Failed to parse response: HTTP ${res.status}`,
+    },
+  } as any));
+
+  if (!res.ok) {
+    const errorMsg = json.error?.message || `Failed to fetch admin dashboard: HTTP ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.response = json;
+    throw err;
+  }
+
+  return json.data;
+}
+
+// Aliases for compatibility
+export const getRequesterDashboardApi = fetchRequesterDashboard;
+export const getStaffDashboardApi = fetchStaffDashboard;
+export const getAdminDashboardApi = fetchAdminDashboard;

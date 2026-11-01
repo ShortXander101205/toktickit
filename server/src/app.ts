@@ -8,6 +8,7 @@ import { attachmentsRouter } from "./routes/attachments.js";
 import { authRouter } from "./routes/auth.js";
 import { staffRouter } from "./routes/staff.js";
 import { adminRouter } from "./routes/admin.js";
+import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { optionalAuthenticate, requirePasswordChanged } from "./middleware/auth.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
@@ -48,6 +49,12 @@ app.use("/api/staff", staffRouter);
 // ---------------------------------------------------------------------------
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/admin", adminRouter);
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Issue 21 Role-Based Dashboard Routes
+// ---------------------------------------------------------------------------
+app.use("/api/v1/dashboards", dashboardRouter);
+app.use("/api/dashboards", dashboardRouter);
 
 // ---------------------------------------------------------------------------
 // Lab 2 — Feature 2 Reference Data & Requester Routes

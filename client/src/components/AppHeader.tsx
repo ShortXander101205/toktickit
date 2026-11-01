@@ -2,9 +2,11 @@ import React, { useState, useContext } from "react";
 import { RequesterContext } from "../context/RequesterContext.js";
 import { AuthContext } from "../context/AuthContext.js";
 
-interface AppHeaderProps {
-  currentTab?: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users";
-  onTabChange?: (tab: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users") => void;
+export type AppTab = "dashboard" | "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users";
+
+export interface AppHeaderProps {
+  currentTab?: AppTab;
+  onTabChange?: (tab: AppTab) => void;
 }
 
 export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderProps) {
@@ -127,6 +129,19 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
         {/* Center Desktop Nav (>= 768px) — Hidden on Login & Mandatory Password Change screens */}
         {showNavigationLinks && (
           <nav className="d-none d-md-flex align-items-center gap-2 gap-lg-3">
+            <button
+              type="button"
+              className="btn btn-link text-white text-decoration-none px-2 py-1"
+              data-testid="nav-dashboard"
+              style={{
+                fontWeight: currentTab === "dashboard" ? 700 : 400,
+                borderBottom: currentTab === "dashboard" ? "2px solid #ffffff" : "2px solid transparent",
+                borderRadius: 0,
+              }}
+              onClick={() => onTabChange && onTabChange("dashboard")}
+            >
+              Dashboard
+            </button>
             {showUserManagementLink && (
               <button
                 type="button"
@@ -422,6 +437,22 @@ export function AppHeader({ currentTab = "my-tickets", onTabChange }: AppHeaderP
           {/* Navigation Links with accessible min 44px height */}
           {showNavigationLinks && (
             <div className="d-flex flex-column gap-1">
+              <button
+                type="button"
+                className="btn btn-link text-white text-start text-decoration-none py-2 px-3 d-flex align-items-center rounded"
+                data-testid="nav-dashboard-mobile"
+                style={{
+                  fontWeight: currentTab === "dashboard" ? 700 : 400,
+                  minHeight: "44px",
+                  backgroundColor: currentTab === "dashboard" ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                }}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onTabChange && onTabChange("dashboard");
+                }}
+              >
+                Dashboard
+              </button>
               {showUserManagementLink && (
                 <button
                   type="button"

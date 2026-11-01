@@ -446,7 +446,11 @@ export async function handleGetTickets(req: Request, res: Response) {
     ...(parsedCategoryId !== undefined ? { categoryId: parsedCategoryId } : {}),
     ...(normalizedReqPriority ? { requestedPriority: parsePriorityEnum(normalizedReqPriority) } : {}),
     ...(itPriorityCondition ? itPriorityCondition : {}),
-    ...(statusFilter ? { currentStatus: parseTicketStatusEnum(statusFilter) } : {}),
+    ...(statusFilter
+      ? statusFilter.toUpperCase() === "OPEN_ACTIVE"
+        ? { currentStatus: { in: [TicketStatus.NEW, TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_FOR_REQUESTER, TicketStatus.REOPENED] } }
+        : { currentStatus: parseTicketStatusEnum(statusFilter) }
+      : {}),
     ...(searchKeyword
       ? {
           OR: [
