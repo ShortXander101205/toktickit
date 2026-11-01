@@ -534,6 +534,14 @@ export async function getStaffTicketsApi(
   return json.data;
 }
 
+const ticketUpdatedAtCache = new Map<number, string>();
+
+export function setTicketUpdatedAtToken(ticketId: number, updatedAt?: string | null): void {
+  if (updatedAt) {
+    ticketUpdatedAtCache.set(ticketId, updatedAt);
+  }
+}
+
 // Issue 14: IT Staff Ticket Detail & Operational Controls API
 export async function getTicketDetailApi(
   ticketId: number,
@@ -568,6 +576,10 @@ export async function getTicketDetailApi(
     err.status = res.status;
     err.response = json;
     throw err;
+  }
+
+  if (json.data?.updatedAt) {
+    ticketUpdatedAtCache.set(ticketId, json.data.updatedAt);
   }
 
   return json.data;
@@ -683,7 +695,8 @@ export async function updateTicketPriorityApi(
 
 export async function transitionTicketStatusApi(
   ticketId: number,
-  targetStatus: string
+  targetStatus: string,
+  updatedAt?: string
 ): Promise<any> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
@@ -693,11 +706,20 @@ export async function transitionTicketStatusApi(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  const resolvedUpdatedAt = updatedAt ?? ticketUpdatedAtCache.get(ticketId);
+  const payload: Record<string, any> = {
+    status: targetStatus,
+    targetStatus,
+  };
+  if (resolvedUpdatedAt !== undefined) {
+    payload.updatedAt = resolvedUpdatedAt;
+  }
+
   const res = await fetch(`${API_URL}/api/v1/staff/tickets/${ticketId}/status`, {
     method: "PATCH",
     headers,
     credentials: "include",
-    body: JSON.stringify({ targetStatus }),
+    body: JSON.stringify(payload),
   });
 
   const json: ApiResponse<any> = await res.json().catch(() => ({
@@ -712,12 +734,20 @@ export async function transitionTicketStatusApi(
     const errorMsg = json.error?.message || `Failed to transition ticket status: HTTP ${res.status}`;
     const err: any = new Error(errorMsg);
     err.status = res.status;
+    err.code = json.error?.code;
     err.response = json;
     throw err;
   }
 
-  return json.data;
+  const resultData = json.data ?? json;
+  if (resultData?.updatedAt) {
+    ticketUpdatedAtCache.set(ticketId, resultData.updatedAt);
+  }
+
+  return resultData;
 }
+
+export const updateStaffTicketStatus = transitionTicketStatusApi;
 
 export async function resolveTicketRequestApi(
   ticketId: number,
