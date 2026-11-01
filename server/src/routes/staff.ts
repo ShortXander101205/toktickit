@@ -6,6 +6,12 @@ import {
   requirePasswordChanged,
   requireRole,
 } from "../middleware/auth.js";
+import {
+  ALLOWED_STATUS_TRANSITIONS,
+  getAllowedNextStatuses,
+  isTransitionAllowed as isWorkflowTransitionAllowed,
+} from "../services/ticketWorkflow.service.js";
+import { handleTransitionTicketStatus } from "../controllers/ticketWorkflow.controller.js";
 
 export const staffRouter = Router();
 
@@ -39,29 +45,11 @@ function normalizePriority(input: string): Priority | null {
   return null;
 }
 
-// Status Transition Matrix validator (SDS Approved Decision D-02 / Spec §6.1)
+export { ALLOWED_STATUS_TRANSITIONS, getAllowedNextStatuses };
+
+// Status Transition Matrix validator (BR-06 / SDS §4.2 / Issue 20 Contract §2)
 export function isTransitionAllowed(from: TicketStatus, to: TicketStatus): boolean {
-  if (from === to) return true;
-  switch (from) {
-    case TicketStatus.NEW:
-      return ([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED] as TicketStatus[]).includes(to);
-    case TicketStatus.OPEN:
-      return ([TicketStatus.IN_PROGRESS, TicketStatus.WAITING_FOR_REQUESTER, TicketStatus.RESOLVED, TicketStatus.CANCELLED] as TicketStatus[]).includes(to);
-    case TicketStatus.IN_PROGRESS:
-      return ([TicketStatus.WAITING_FOR_REQUESTER, TicketStatus.RESOLVED, TicketStatus.CANCELLED] as TicketStatus[]).includes(to);
-    case TicketStatus.WAITING_FOR_REQUESTER:
-      return ([TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CANCELLED] as TicketStatus[]).includes(to);
-    case TicketStatus.RESOLVED:
-      return ([TicketStatus.CLOSED, TicketStatus.REOPENED, TicketStatus.CANCELLED] as TicketStatus[]).includes(to);
-    case TicketStatus.CLOSED:
-      return ([TicketStatus.REOPENED] as TicketStatus[]).includes(to);
-    case TicketStatus.REOPENED:
-      return ([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED] as TicketStatus[]).includes(to);
-    case TicketStatus.CANCELLED:
-      return ([TicketStatus.REOPENED] as TicketStatus[]).includes(to);
-    default:
-      return false;
-  }
+  return isWorkflowTransitionAllowed(from, to);
 }
 
 /**
@@ -473,78 +461,7 @@ staffRouter.patch("/tickets/:id/priority", async (req: Request, res: Response): 
 
 /**
  * PATCH /api/v1/staff/tickets/:id/status
- * Transition status adhering to the Status Transition Matrix.
+ * Transition status adhering to the Status Transition Matrix (BR-06),
+ * Resolution Gate Invariant (BR-07), and Optimistic Concurrency Control (BR-09).
  */
-staffRouter.patch("/tickets/:id/status", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const prisma = getPrisma();
-    const ticketId = parseInt(req.params.id, 10);
-    if (isNaN(ticketId)) {
-      res.status(400).json({
-        success: false,
-        error: { code: "INVALID_TICKET_ID", message: "Invalid ticket ID." },
-      });
-      return;
-    }
-
-    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-    if (!ticket) {
-      res.status(404).json({
-        success: false,
-        error: { code: "TICKET_NOT_FOUND", message: "Ticket not found." },
-      });
-      return;
-    }
-
-    const { targetStatus, status } = req.body;
-    const rawStatus = targetStatus || status;
-    if (!rawStatus || typeof rawStatus !== "string") {
-      res.status(422).json({
-        success: false,
-        error: { code: "INVALID_STATUS", message: "targetStatus is required." },
-      });
-      return;
-    }
-
-    const nextStatus = normalizeStatus(rawStatus);
-    if (!nextStatus) {
-      res.status(422).json({
-        success: false,
-        error: { code: "INVALID_STATUS", message: "Invalid status value." },
-      });
-      return;
-    }
-
-    if (!isTransitionAllowed(ticket.currentStatus, nextStatus)) {
-      res.status(422).json({
-        success: false,
-        error: {
-          code: "INVALID_STATUS_TRANSITION",
-          message: `Cannot transition status from ${ticket.currentStatus} to ${nextStatus}.`,
-        },
-      });
-      return;
-    }
-
-    const updated = await prisma.ticket.update({
-      where: { id: ticketId },
-      data: { currentStatus: nextStatus },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        id: updated.id,
-        ticketNumber: updated.ticketNumber,
-        currentStatus: updated.currentStatus,
-        updatedAt: updated.updatedAt.toISOString(),
-      },
-    });
-  } catch (error: any) {
-    console.error("Error updating ticket status:", error);
-    res.status(500).json({
-      success: false,
-      error: { code: "INTERNAL_ERROR", message: "Failed to update ticket status." },
-    });
-  }
-});
+staffRouter.patch("/tickets/:id/status", handleTransitionTicketStatus);

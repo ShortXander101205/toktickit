@@ -119,7 +119,10 @@ export interface TicketDetail extends Ticket {
   owner?: StaffTicketOwnerDTO | null;
   ticketOwner?: string | null;
   resolutionSummary?: string | null;
+  requesterResolvedAt?: string | null;
   requesterResolutionConfirmedAt?: string | null;
+  resolvedAt?: string | null;
+  closedAt?: string | null;
   attachments: Attachment[];
   removedAttachments: Attachment[];
   publicComments?: PublicCommentDTO[];
@@ -136,7 +139,9 @@ export interface UpdatePriorityPayload {
 }
 
 export interface TransitionStatusPayload {
-  targetStatus: TicketStatus | string;
+  targetStatus?: TicketStatus | string;
+  status?: TicketStatus | string;
+  updatedAt?: string;
 }
 
 export interface CreateCommentPayload {

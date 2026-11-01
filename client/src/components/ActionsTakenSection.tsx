@@ -114,6 +114,9 @@ export function ActionsTakenSection({
       const response = await getActionsTakenApi(ticketId, requesterId);
       const sorted = sortActionsChronologically(response.items || []);
       setActions(sorted);
+      if (onActionsUpdated) {
+        onActionsUpdated(sorted);
+      }
     } catch (err: any) {
       setFetchError(err?.message || "Failed to load actions taken records.");
     } finally {
