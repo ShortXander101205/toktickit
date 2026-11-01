@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import { RequesterProvider, useRequester } from "./context/RequesterContext.js";
-import { AppHeader } from "./components/AppHeader.js";
+import { AppHeader, AppTab } from "./components/AppHeader.js";
 import { Login } from "./components/Login.js";
 import { ChangePassword } from "./components/ChangePassword.js";
 import { RequesterSelector } from "./components/RequesterSelector.js";
@@ -13,22 +13,26 @@ import { RequesterTicketDetail } from "./components/RequesterTicketDetail.js";
 import { StaffTicketDetail } from "./components/StaffTicketDetail.js";
 import { StaffTicketQueue } from "./components/StaffTicketQueue.js";
 import { UserManagement } from "./components/UserManagement.js";
+import { RequesterDashboard } from "./components/RequesterDashboard.js";
+import { StaffDashboard } from "./components/StaffDashboard.js";
 
 type SystemCheckState = "idle" | "loading" | "success" | "error";
 
 function MainApp() {
   const { user } = useAuth();
   const { currentRequester, isSwitchModalOpen, closeSwitchModal } = useRequester();
-  const [activeTab, setActiveTab] = useState<"my-tickets" | "create-ticket" | "ticket-queue" | "admin-users">("my-tickets");
+  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
 
-  // Default to ticket queue for IT Staff and Administrator
+  // Drill-down filter states for MyTickets and StaffTicketQueue
+  const [requesterStatusFilter, setRequesterStatusFilter] = useState<string>("");
+  const [staffStatusFilter, setStaffStatusFilter] = useState<string>("");
+  const [staffOwnerFilter, setStaffOwnerFilter] = useState<string>("");
+  const [staffAutoFocusSearch, setStaffAutoFocusSearch] = useState<boolean>(false);
+
+  // Default post-login tab to dashboard across roles
   useEffect(() => {
-    if (user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR") {
-      setActiveTab("ticket-queue");
-    } else {
-      setActiveTab("my-tickets");
-    }
+    setActiveTab("dashboard");
   }, [user?.role]);
 
   // System status checker (preserved from Lab 1)
@@ -36,9 +40,42 @@ function MainApp() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   // Reset selected ticket detail when tab switches
-  function handleTabChange(tab: "my-tickets" | "create-ticket" | "ticket-queue" | "admin-users") {
+  function handleTabChange(tab: AppTab) {
     setSelectedTicketId(null);
+    if (tab !== "my-tickets") {
+      setRequesterStatusFilter("");
+    }
+    if (tab !== "ticket-queue") {
+      setStaffStatusFilter("");
+      setStaffOwnerFilter("");
+      setStaffAutoFocusSearch(false);
+    }
     setActiveTab(tab);
+  }
+
+  function handleSelectTicket(ticketId: string | number) {
+    const num = typeof ticketId === "number" ? ticketId : parseInt(String(ticketId), 10);
+    if (!isNaN(num)) {
+      setSelectedTicketId(num);
+    }
+  }
+
+  function handleDrillDownMyTickets(statusFilter: string) {
+    setSelectedTicketId(null);
+    setRequesterStatusFilter(statusFilter);
+    setActiveTab("my-tickets");
+  }
+
+  function handleDrillDownStaffQueue(filters: {
+    status?: string;
+    ownerId?: string;
+    autoFocusSearch?: boolean;
+  }) {
+    setSelectedTicketId(null);
+    setStaffStatusFilter(filters.status ?? "");
+    setStaffOwnerFilter(filters.ownerId ?? "");
+    setStaffAutoFocusSearch(Boolean(filters.autoFocusSearch));
+    setActiveTab("ticket-queue");
   }
 
   async function handleCheck() {
@@ -85,21 +122,56 @@ function MainApp() {
                   onBack={() => setSelectedTicketId(null)}
                 />
               )
+            ) : activeTab === "dashboard" ? (
+              user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? (
+                <StaffDashboard
+                  user={user}
+                  onDrillDownQueue={handleDrillDownStaffQueue}
+                  onSelectTicket={handleSelectTicket}
+                  onCreateTicket={() => {
+                    setSelectedTicketId(null);
+                    setActiveTab("create-ticket");
+                  }}
+                  onManageUsers={() => {
+                    setSelectedTicketId(null);
+                    setActiveTab("admin-users");
+                  }}
+                />
+              ) : (
+                <RequesterDashboard
+                  user={user}
+                  requesterId={currentRequester?.id}
+                  onDrillDownMyTickets={handleDrillDownMyTickets}
+                  onSelectTicket={handleSelectTicket}
+                  onCreateTicket={() => {
+                    setSelectedTicketId(null);
+                    setActiveTab("create-ticket");
+                  }}
+                  onViewAllTickets={() => {
+                    setSelectedTicketId(null);
+                    setRequesterStatusFilter("");
+                    setActiveTab("my-tickets");
+                  }}
+                />
+              )
             ) : activeTab === "admin-users" && user?.role === "ADMINISTRATOR" ? (
               <UserManagement />
             ) : activeTab === "ticket-queue" ? (
               <StaffTicketQueue
-                onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}
+                onSelectTicket={handleSelectTicket}
+                initialStatusFilter={staffStatusFilter}
+                initialOwnerFilter={staffOwnerFilter}
+                autoFocusSearch={staffAutoFocusSearch}
               />
             ) : activeTab === "create-ticket" ? (
               <CreateTicket
                 onSuccess={() => {
                   setSelectedTicketId(null);
-                  setActiveTab(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? "ticket-queue" : "my-tickets");
+                  setActiveTab("dashboard");
                 }}
                 onCancel={() => {
                   setSelectedTicketId(null);
-                  setActiveTab(user?.role === "IT_STAFF" || user?.role === "ADMINISTRATOR" ? "ticket-queue" : "my-tickets");
+                  setActiveTab("dashboard");
                 }}
               />
             ) : (
@@ -108,7 +180,8 @@ function MainApp() {
                   setSelectedTicketId(null);
                   setActiveTab("create-ticket");
                 }}
-                onSelectTicket={(ticketId) => setSelectedTicketId(ticketId)}
+                onSelectTicket={handleSelectTicket}
+                initialStatusFilter={requesterStatusFilter}
               />
             )}
           </div>

@@ -329,3 +329,131 @@ export interface UpdateActionTakenPayload {
   attachmentNotes?: string | null;
   version: number;
 }
+
+
+// ---------------------------------------------------------------------------
+// Lab 4 — Issue 21 Dashboard Contracts
+// ---------------------------------------------------------------------------
+
+export interface DashboardRecentTicketDTO {
+  id: number;
+  ticketNumber: string;
+  summary: string;
+  title: string;
+  categoryId: number;
+  categoryName: string;
+  category?: {
+    id: number;
+    name: string;
+    code?: string | null;
+  };
+  requestedPriority: string;
+  itPriority?: string | null;
+  priority: string;
+  currentStatus: string;
+  status: string;
+  ownerId?: number | null;
+  ownerName?: string | null;
+  owner?: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
+  requesterId: number;
+  requesterName?: string;
+  requester?: {
+    id: number;
+    name: string;
+    email: string;
+    department?: string | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequesterDashboardMetricsDTO {
+  totalOpen: number;
+  waitingForRequester: number;
+  inProgress: number;
+  resolved: number;
+  closed: number;
+  metrics?: {
+    totalOpen: number;
+    waitingForRequester: number;
+    inProgress: number;
+    resolved: number;
+    closed: number;
+    totalOpenTickets: number;
+    waitingForRequesterTickets: number;
+    inProgressTickets: number;
+    recentlyResolvedTickets: number;
+    resolvedTickets: number;
+    closedTickets: number;
+  };
+  recentTickets: DashboardRecentTicketDTO[];
+}
+
+export interface StaffDashboardMetricsDTO {
+  newCount: number;
+  openCount: number;
+  inProgressCount: number;
+  waitingForRequesterCount: number;
+  myAssignedCount: number;
+  unassignedCount: number;
+  resolvedCount: number;
+  closedCount: number;
+  reopenedCount: number;
+  cancelledCount: number;
+  urgentAttentionCount: number;
+  statusBreakdown: Record<string, number>;
+  priorityBreakdown: Record<string, number>;
+  metrics?: {
+    newCount: number;
+    openCount: number;
+    inProgressCount: number;
+    waitingForRequesterCount: number;
+    myAssignedCount: number;
+    unassignedCount: number;
+    resolvedCount: number;
+    closedCount: number;
+    reopenedCount: number;
+    cancelledCount: number;
+    urgentAttentionCount: number;
+    statusBreakdown: Record<string, number>;
+    priorityBreakdown: Record<string, number>;
+  };
+  recentTickets: DashboardRecentTicketDTO[];
+}
+
+export interface AdminUserMetricsDTO {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  activeUsersCount?: number;
+  inactiveUsersCount?: number;
+  requestersCount: number;
+  staffCount: number;
+  adminCount: number;
+  usersByRole?: {
+    REQUESTER: number;
+    IT_STAFF: number;
+    ADMINISTRATOR: number;
+  };
+}
+
+export interface AdminDashboardMetricsDTO extends StaffDashboardMetricsDTO {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  requestersCount: number;
+  staffCount: number;
+  adminCount: number;
+  users?: AdminUserMetricsDTO;
+  operationalMetrics?: StaffDashboardMetricsDTO["metrics"];
+}
+
+export type RequesterDashboardResponse = RequesterDashboardMetricsDTO;
+export type StaffDashboardResponse = StaffDashboardMetricsDTO;
+export type AdminDashboardResponse = AdminDashboardMetricsDTO;
+export type DashboardRecentTicket = DashboardRecentTicketDTO;
