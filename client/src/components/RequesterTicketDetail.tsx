@@ -439,7 +439,7 @@ export function RequesterTicketDetail({ ticketId, onBack }: RequesterTicketDetai
             </div>
           </div>
         ) : (
-          !["RESOLVED", "CLOSED", "CANCELLED"].includes(ticket.currentStatus.toUpperCase()) && (
+          !["CLOSED", "CANCELLED"].includes(ticket.currentStatus.toUpperCase()) && (
             <div
               className="card border-0 shadow-sm p-3 mb-3 d-flex flex-row justify-content-between align-items-center flex-wrap gap-2"
               style={{ borderRadius: "8px", backgroundColor: "#F0FDF4", border: "1px solid #BBF7D0" }}

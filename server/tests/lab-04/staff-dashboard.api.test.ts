@@ -121,6 +121,18 @@ describe("Issue 21: IT Staff & Administrator Operational Dashboard API (BR-11, B
         where: { id: { in: createdTicketIds } },
       });
     }
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: [
+            "staff.dash1@kmutt.ac.th",
+            "staff.dash2@kmutt.ac.th",
+            "admin.dash@kmutt.ac.th",
+            "req.dash@kmutt.ac.th",
+          ],
+        },
+      },
+    });
   });
 
   async function createQueueTicket(opts: {

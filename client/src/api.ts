@@ -661,6 +661,10 @@ export async function assignTicketOwnerApi(
     throw err;
   }
 
+  if (json.data?.updatedAt) {
+    ticketUpdatedAtCache.set(ticketId, json.data.updatedAt);
+  }
+
   return json.data;
 }
 
@@ -697,6 +701,10 @@ export async function updateTicketPriorityApi(
     err.status = res.status;
     err.response = json;
     throw err;
+  }
+
+  if (json.data?.updatedAt) {
+    ticketUpdatedAtCache.set(ticketId, json.data.updatedAt);
   }
 
   return json.data;

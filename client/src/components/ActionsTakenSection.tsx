@@ -107,6 +107,17 @@ export function ActionsTakenSection({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // WCAG 2.1.2: Modal Escape Key Dismissal
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && formMode !== "closed") {
+        setFormMode("closed");
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [formMode]);
+
   const loadActions = useCallback(async () => {
     setLoading(true);
     setFetchError(null);

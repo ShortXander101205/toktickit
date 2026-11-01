@@ -103,7 +103,7 @@ function MainApp() {
       )}
 
       {/* Main Workspace Container */}
-      <main className="container-xl py-4 flex-grow-1" style={{ maxWidth: "1200px" }}>
+      <main id="main-content" tabIndex={-1} role="main" className="container-xl py-4 flex-grow-1" style={{ maxWidth: "1200px" }}>
         {!isAuthenticated ? (
           <Login />
         ) : mustChangePassword ? (

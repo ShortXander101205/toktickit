@@ -396,3 +396,39 @@ button:disabled,
     width: 100%;
   }
 }
+
+
+/* Accessible Skip Navigation Link (WCAG 2.4.1) */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 1rem;
+  background-color: var(--color-primary-green);
+  color: #ffffff !important;
+  padding: 0.625rem 1.25rem;
+  z-index: 10000;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-modal);
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 1rem;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 0 0 5px var(--color-primary-green);
+}
+
+/* WCAG 2.4.7: Uniform High-Contrast Focus Indicators */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: none !important;
+  border-color: var(--color-secondary-green) !important;
+  box-shadow: 0 0 0 3px rgba(11, 122, 70, 0.35) !important;
+}
